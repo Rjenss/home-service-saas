@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Field Service MVP</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header>
+    <h1>Field Service Dashboard</h1>
+    <p>Internal tool to test and control the service platform.</p>
+  </header>
+
+  <main>
+    <!-- SECTION: API health / test -->
+    <section class="card">
+      <h2>API Status</h2>
+      <p>This calls your Lambda `/hello` endpoint to confirm everything works.</p>
+      <div class="inline">
+        <input
+          id="apiBaseUrl"
+          type="text"
+          placeholder="https://YOUR-ID.execute-api.us-east-1.amazonaws.com/Prod"
+        />
+        <button id="testApiBtn">Test API</button>
+      </div>
+      <div id="apiStatus" class="status"></div>
+    </section>
+
+    <!-- SECTION: Create job -->
+    <section class="card">
+      <h2>Create Job</h2>
+      <p>Later this will POST to your backend (e.g., /jobs). For now it just logs.</p>
+      <form id="jobForm">
+        <div class="field">
+          <label for="customerName">Customer name</label>
+          <input id="customerName" name="customerName" required />
+        </div>
+
+        <div class="field">
+          <label for="customerPhone">Customer phone</label>
+          <input id="customerPhone" name="customerPhone" />
+        </div>
+
+        <div class="field">
+          <label for="address">Address</label>
+          <input id="address" name="address" />
+        </div>
+
+        <div class="field">
+          <label for="description">Problem description</label>
+          <textarea id="description" name="description" rows="3"></textarea>
+        </div>
+
+        <div class="field">
+          <label for="priority">Priority</label>
+          <select id="priority" name="priority">
+            <option value="normal">Normal</option>
+            <option value="urgent">Urgent</option>
+            <option value="emergency">Emergency</option>
+          </select>
+        </div>
+
+        <button type="submit">Create Job (stub)</button>
+      </form>
+      <div id="jobFormStatus" class="status"></div>
+    </section>
+
+    <!-- SECTION: Jobs list -->
+    <section class="card">
+      <h2>Jobs</h2>
+      <p>Later this will call GET /jobs and list them. For now we show dummy data.</p>
+      <button id="refreshJobsBtn">Refresh Jobs (stub)</button>
+      <div id="jobsList" class="jobs-list"></div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
