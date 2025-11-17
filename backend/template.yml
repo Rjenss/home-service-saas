@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Simple API + Lambda for MVP
+Description: Simple API + Lambda + Jobs table for MVP
 
 Globals:
   Function:
@@ -9,20 +9,65 @@ Globals:
     MemorySize: 128
 
 Resources:
+  # DynamoDB table to store jobs
+  JobsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: JobsTable
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: jobId
+          AttributeType: S
+      KeySchema:
+        - AttributeName: jobId
+          KeyType: HASH
+      SSESpecification:
+        SSEEnabled: true
+
+  # Explicit API Gateway so we can configure CORS
+  ApiGateway:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Cors:
+        AllowMethods: "'GET,POST,OPTIONS'"
+        AllowHeaders: "'Content-Type'"
+        AllowOrigin: "'*'"
+
+  # Single Lambda handling all routes
   ApiFunction:
     Type: AWS::Serverless::Function
     Properties:
       FunctionName: mvp-api-function
       Handler: src.app.lambda_handler
       CodeUri: .
+      Environment:
+        Variables:
+          JOBS_TABLE: !Ref JobsTable
+      Policies:
+        - DynamoDBCrudPolicy:
+            TableName: !Ref JobsTable
       Events:
-        Api:
+        HelloApi:
           Type: Api
           Properties:
+            RestApiId: !Ref ApiGateway
             Path: /hello
             Method: get
+        JobsGet:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /jobs
+            Method: get
+        JobsPost:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /jobs
+            Method: post
 
 Outputs:
   ApiUrl:
-    Description: "API endpoint URL"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello"
+    Description: "API base URL"
+    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/Prod"
