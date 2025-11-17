@@ -39,23 +39,6 @@ jobs:
         run: |
           sam deploy \
             --stack-name mvp-api-stack \
-            --no-confirm-changeset \
-            --no-fail-on-empty-changeset \
-            --capabilities CAPABILITY_IAM
-      - name: Deploy SAM application
-        working-directory: ./backend
-        run: |
-          sam deploy \
-            --stack-name mvp-api-stack \
-            --resolve-s3 \
-            --no-confirm-changeset \
-            --no-fail-on-empty-changeset \
-            --capabilities CAPABILITY_IAM
-      - name: Deploy SAM application
-        working-directory: ./backend
-        run: |
-          sam deploy \
-            --stack-name mvp-api-stack \
             --resolve-s3 \
             --no-confirm-changeset \
             --no-fail-on-empty-changeset \
