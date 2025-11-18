@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Simple API + Lambda + Jobs table for MVP
+Description: Simple API + Lambda + Jobs + Customers tables for MVP
 
 Globals:
   Function:
@@ -20,6 +20,21 @@ Resources:
           AttributeType: S
       KeySchema:
         - AttributeName: jobId
+          KeyType: HASH
+      SSESpecification:
+        SSEEnabled: true
+
+  # DynamoDB table to store customers
+  CustomersTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: CustomersTable
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
           KeyType: HASH
       SSESpecification:
         SSEEnabled: true
@@ -44,9 +59,12 @@ Resources:
       Environment:
         Variables:
           JOBS_TABLE: !Ref JobsTable
+          CUSTOMERS_TABLE: !Ref CustomersTable
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref JobsTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref CustomersTable
       Events:
         HelloApi:
           Type: Api
@@ -54,6 +72,8 @@ Resources:
             RestApiId: !Ref ApiGateway
             Path: /hello
             Method: get
+
+        # Jobs endpoints
         JobsGet:
           Type: Api
           Properties:
@@ -65,6 +85,20 @@ Resources:
           Properties:
             RestApiId: !Ref ApiGateway
             Path: /jobs
+            Method: post
+
+        # Customers endpoints
+        CustomersGet:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /customers
+            Method: get
+        CustomersPost:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /customers
             Method: post
 
 Outputs:
