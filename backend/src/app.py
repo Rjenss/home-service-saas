@@ -26,7 +26,7 @@ def lambda_handler(event, context):
 
     # Simple health/check endpoint
     if path == "/hello" and method == "GET":
-        return response(200, "Hello from my first AWS Lambda deployed via GitHub Actions")
+        return response(200, "Ryan's Lamba")
 
     # Jobs endpoints
     if path == "/jobs" and method == "POST":

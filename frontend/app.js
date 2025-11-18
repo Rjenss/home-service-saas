@@ -1,47 +1,32 @@
-// You can hard-code this later once you're sure of the URL.
-// For now we read it from the input so you can change regions/stacks easily.
+// Set this to your API base URL from CloudFormation Outputs (ApiUrl)
+// Example: "https://abc123.execute-api.us-east-1.amazonaws.com/Prod"
+const API_BASE_URL = "https://fdho6lafwk.execute-api.us-east-2.amazonaws.com/Prod";
+
 function getApiBaseUrl() {
-  const input = document.getElementById("apiBaseUrl");
-  return (input.value || "").trim().replace(/\/+$/, ""); // strip trailing slash
+  return API_BASE_URL.replace(/\/+$/, "");
 }
 
 document.addEventListener("DOMContentLoaded", () => {
-  const testApiBtn = document.getElementById("testApiBtn");
-  const apiStatusEl = document.getElementById("apiStatus");
-
   const jobForm = document.getElementById("jobForm");
   const jobFormStatus = document.getElementById("jobFormStatus");
-
   const refreshJobsBtn = document.getElementById("refreshJobsBtn");
   const jobsListEl = document.getElementById("jobsList");
 
-  // 1) Test API (/hello)
-  testApiBtn.addEventListener("click", async () => {
-    const baseUrl = getApiBaseUrl();
-    if (!baseUrl) {
-      apiStatusEl.textContent = "Please paste your API base URL (ending in /Prod).";
-      return;
-    }
+  // Load jobs on page load
+  loadJobs();
 
-    const url = `${baseUrl}/hello`;
-    apiStatusEl.textContent = `Calling ${url} ...`;
-
-    try {
-      const res = await fetch(url, { method: "GET" });
-      const text = await res.text();
-      apiStatusEl.textContent = `Status: ${res.status}\nResponse: ${text}`;
-    } catch (err) {
-      apiStatusEl.textContent = `Error calling API:\n${String(err)}`;
-    }
+  // Refresh button
+  refreshJobsBtn.addEventListener("click", () => {
+    loadJobs();
   });
 
-  // 2) Create Job (will POST to /jobs later)
+  // Create Job (POST /jobs)
   jobForm.addEventListener("submit", async (e) => {
     e.preventDefault();
 
     const baseUrl = getApiBaseUrl();
     if (!baseUrl) {
-      jobFormStatus.textContent = "Set API base URL before creating jobs.";
+      jobFormStatus.textContent = "API base URL is not set in app.js.";
       return;
     }
 
@@ -53,45 +38,68 @@ document.addEventListener("DOMContentLoaded", () => {
       priority: document.getElementById("priority").value,
     };
 
-    // For now, we only log it + pretend success.
-    // Later you'll call: POST `${baseUrl}/jobs`
-    console.log("Job to create:", job);
-    jobFormStatus.textContent = "Job captured locally (stub). Backend /jobs POST not implemented yet.";
-    jobForm.reset();
+    if (!job.customerName) {
+      jobFormStatus.textContent = "Customer name is required.";
+      return;
+    }
+
+    jobFormStatus.textContent = "Creating job...";
+
+    try {
+      const res = await fetch(`${baseUrl}/jobs`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(job),
+      });
+
+      if (!res.ok) {
+        const text = await res.text();
+        jobFormStatus.textContent = `Error creating job. Status ${res.status}. ${text}`;
+        return;
+      }
+
+      const createdJob = await res.json();
+      jobFormStatus.textContent = `Job created with ID ${createdJob.jobId}.`;
+
+      jobForm.reset();
+      await loadJobs();
+    } catch (err) {
+      jobFormStatus.textContent = `Error creating job: ${String(err)}`;
+    }
   });
 
-  // 3) Jobs list (will GET /jobs later). For now, stub data.
-  refreshJobsBtn.addEventListener("click", async () => {
-    jobsListEl.innerHTML = ""; // clear
+  async function loadJobs() {
+    const baseUrl = getApiBaseUrl();
+    if (!baseUrl) {
+      jobsListEl.textContent = "API base URL is not set in app.js.";
+      return;
+    }
 
-    // Later:
-    // const baseUrl = getApiBaseUrl();
-    // const res = await fetch(`${baseUrl}/jobs`);
-    // const jobs = await res.json();
-    // renderJobs(jobs);
+    jobsListEl.textContent = "Loading jobs...";
 
-    const dummyJobs = [
-      {
-        id: "JOB-1001",
-        customerName: "John Smith",
-        description: "Leaking sink in kitchen",
-        priority: "urgent",
-      },
-      {
-        id: "JOB-1002",
-        customerName: "Maria Garcia",
-        description: "No power in bedroom outlets",
-        priority: "normal",
-      },
-    ];
+    try {
+      const res = await fetch(`${baseUrl}/jobs`, {
+        method: "GET",
+      });
 
-    renderJobs(dummyJobs);
-  });
+      if (!res.ok) {
+        const text = await res.text();
+        jobsListEl.textContent = `Error loading jobs. Status ${res.status}. ${text}`;
+        return;
+      }
+
+      const jobs = await res.json();
+      renderJobs(jobs);
+    } catch (err) {
+      jobsListEl.textContent = `Error loading jobs: ${String(err)}`;
+    }
+  }
 
   function renderJobs(jobs) {
     jobsListEl.innerHTML = "";
-    if (!jobs.length) {
-      jobsListEl.textContent = "No jobs to show.";
+
+    if (!jobs || jobs.length === 0) {
+      jobsListEl.textContent = "No jobs yet.";
       return;
     }
 
@@ -102,7 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const header = document.createElement("div");
       header.className = "job-card-header";
       header.innerHTML = `
-        <span>${job.id || "(unsaved)"}</span>
+        <span>${job.jobId || "(no id)"}</span>
         <span>${job.priority || ""}</span>
       `;
 
@@ -111,6 +119,8 @@ document.addEventListener("DOMContentLoaded", () => {
       body.innerHTML = `
         <div><strong>${job.customerName || ""}</strong></div>
         <div>${job.description || ""}</div>
+        <div>${job.address || ""}</div>
+        <div>${job.customerPhone || ""}</div>
       `;
 
       card.appendChild(header);
