@@ -26,7 +26,8 @@ customers_table = dynamodb.Table(os.environ["CUSTOMERS_TABLE"])
 def lambda_handler(event, context):
     """
     API entry point for:
-      - GET  /hello (health check)
+      - GET  /          (root)
+      - GET  /hello     (health check)
       - GET  /jobs
       - POST /jobs
       - GET  /customers
@@ -36,6 +37,13 @@ def lambda_handler(event, context):
 
     path = event.get("path", "")
     method = event.get("httpMethod", "")
+
+    # Root endpoint - simple landing / status
+    if path in ("", "/") and method == "GET":
+        return response(200, {
+            "message": "Field Service API - root",
+            "endpoints": ["/hello", "/jobs", "/customers"],
+        })
 
     # Simple health/check endpoint
     if path == "/hello" and method == "GET":
@@ -60,6 +68,7 @@ def lambda_handler(event, context):
         return response(200, "", extra_headers={})
 
     return response(404, {"message": "Not found"})
+
 
 
 # ---------- CUSTOMERS ----------
