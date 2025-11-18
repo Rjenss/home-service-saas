@@ -5,6 +5,7 @@ import logging
 from datetime import datetime
 
 import boto3
+from boto3.dynamodb.conditions import Attr
 
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
@@ -12,14 +13,9 @@ logger.setLevel(logging.INFO)
 dynamodb = boto3.resource("dynamodb")
 
 # One org per deployment / stack
-# You can set ORGANIZATION_ID as an env var in template.yml.
-# If it's not set, we default to "org_pilot" for your MVP.
 ORGANIZATION_ID = os.environ.get("ORGANIZATION_ID", "org_pilot")
 
-# Existing jobs table
 jobs_table = dynamodb.Table(os.environ["JOBS_TABLE"])
-
-# New customers table (must be set in your Lambda env vars via SAM)
 customers_table = dynamodb.Table(os.environ["CUSTOMERS_TABLE"])
 
 
@@ -56,7 +52,7 @@ def lambda_handler(event, context):
     if path == "/customers" and method == "GET":
         return list_customers()
 
-    # Jobs endpoints (internal / dispatcher for now)
+    # Jobs endpoints (internal / dispatcher or simple UI)
     if path == "/jobs" and method == "POST":
         return create_job(event)
 
@@ -70,7 +66,6 @@ def lambda_handler(event, context):
     return response(404, {"message": "Not found"})
 
 
-
 # ---------- CUSTOMERS ----------
 
 
@@ -78,7 +73,7 @@ def create_customer(event):
     """
     Create a new customer record from inbound web/call data.
 
-    Expected JSON body:
+    Expected JSON body (all optional except full_name + phone):
     {
       "full_name": "...",
       "phone": "...",
@@ -100,7 +95,7 @@ def create_customer(event):
         return response(400, {"message": "Invalid JSON body"})
 
     full_name = body.get("full_name")
-    phone = body.get("phone")
+    phone = (body.get("phone") or "").strip()
 
     if not full_name:
         return response(400, {"message": "full_name is required"})
@@ -110,7 +105,6 @@ def create_customer(event):
     now = datetime.utcnow().isoformat() + "Z"
     customer_id = str(uuid.uuid4())
 
-    # Normalize booleans safely
     is_business_raw = body.get("is_business")
     if isinstance(is_business_raw, bool):
         is_business = is_business_raw
@@ -144,40 +138,114 @@ def create_customer(event):
 
 
 def list_customers():
-    """
-    Simple list of customers. For MVP this is a plain scan.
-    You can add pagination / filters later.
-    NOTE: Right now this returns all customers in this table.
-    Since this deployment is single-org, that's fine.
-    """
-    resp = customers_table.scan()
+    """For MVP this is a plain scan; later we can paginate or filter."""
+    resp = customers_table.scan(
+        FilterExpression=Attr("organization_id").eq(ORGANIZATION_ID)
+    )
     items = resp.get("Items", [])
     return response(200, items)
 
 
-# ---------- JOBS (existing behavior kept for now, with org_id added) ----------
+def get_or_create_customer(full_name: str, phone: str):
+    """
+    Look up a customer by phone + organization.
+    If found, return that customer.
+    If not, create a new minimal customer record.
+    """
+    phone_norm = (phone or "").strip()
+
+    # Small-scale MVP: use a scan. Later, add a GSI on phone.
+    resp = customers_table.scan(
+        FilterExpression=Attr("organization_id").eq(ORGANIZATION_ID)
+                          & Attr("phone").eq(phone_norm)
+    )
+    items = resp.get("Items", [])
+
+    if items:
+        customer = items[0]
+        return customer
+
+    # Not found -> create new minimal customer
+    now = datetime.utcnow().isoformat() + "Z"
+    customer_id = str(uuid.uuid4())
+
+    customer = {
+        "id": customer_id,
+        "organization_id": ORGANIZATION_ID,
+        "full_name": full_name,
+        "phone": phone_norm,
+        "email": None,
+        "address_line1": None,
+        "address_line2": None,
+        "city": None,
+        "state": None,
+        "postal_code": None,
+        "country": None,
+        "is_business": False,
+        "company_name": None,
+        "notes": "",
+        "created_at": now,
+        "updated_at": now,
+    }
+
+    customers_table.put_item(Item=customer)
+    return customer
+
+
+# ---------- JOBS ----------
 
 
 def create_job(event):
+    """
+    Create a job from minimal UI data.
+
+    Expected JSON body from frontend:
+
+    {
+      "customerName": "...",
+      "customerPhone": "...",
+      "address": "...",          # optional
+      "description": "...",      # problem description
+      "priority": "normal"       # optional
+    }
+    """
     try:
         body = json.loads(event.get("body") or "{}")
     except json.JSONDecodeError:
         return response(400, {"message": "Invalid JSON body"})
 
+    # Accept either camelCase or some alternative keys
+    customer_name = body.get("customerName") or body.get("full_name")
+    customer_phone = body.get("customerPhone") or body.get("phone")
+    description = body.get("description") or body.get("problem") or ""
+    address = body.get("address")
+    priority = body.get("priority", "normal")
+
+    if not customer_name:
+        return response(400, {"message": "customerName/full_name is required"})
+    if not customer_phone:
+        return response(400, {"message": "customerPhone/phone is required"})
+
+    # Find or create the customer by phone
+    customer = get_or_create_customer(customer_name, customer_phone)
+    customer_id = customer["id"]
+
+    now = datetime.utcnow().isoformat() + "Z"
     job_id = str(uuid.uuid4())
+
     item = {
         "jobId": job_id,
         "organization_id": ORGANIZATION_ID,
-        "customerName": body.get("customerName"),
-        "customerPhone": body.get("customerPhone"),
-        "address": body.get("address"),
-        "description": body.get("description"),
-        "priority": body.get("priority", "normal"),
+        "customer_id": customer_id,
+        "customerName": customer_name,
+        "customerPhone": customer_phone,
+        "address": address,
+        "description": description,
+        "status": "new",
+        "priority": priority,
+        "created_at": now,
+        "updated_at": now,
     }
-
-    # Basic validation
-    if not item["customerName"]:
-        return response(400, {"message": "customerName is required"})
 
     jobs_table.put_item(Item=item)
 
@@ -185,7 +253,9 @@ def create_job(event):
 
 
 def list_jobs():
-    resp = jobs_table.scan()
+    resp = jobs_table.scan(
+        FilterExpression=Attr("organization_id").eq(ORGANIZATION_ID)
+    )
     items = resp.get("Items", [])
     return response(200, items)
 
