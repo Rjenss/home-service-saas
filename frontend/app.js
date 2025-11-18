@@ -9,16 +9,12 @@ function getApiBaseUrl() {
 document.addEventListener("DOMContentLoaded", () => {
   const jobForm = document.getElementById("jobForm");
   const jobFormStatus = document.getElementById("jobFormStatus");
-  const refreshJobsBtn = document.getElementById("refreshJobsBtn");
   const jobsListEl = document.getElementById("jobsList");
 
   // Load jobs on page load
   loadJobs();
 
-  // Refresh button
-  refreshJobsBtn.addEventListener("click", () => {
-    loadJobs();
-  });
+
 
   // Create Job (POST /jobs)
   jobForm.addEventListener("submit", async (e) => {
