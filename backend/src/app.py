@@ -11,6 +11,11 @@ logger.setLevel(logging.INFO)
 
 dynamodb = boto3.resource("dynamodb")
 
+# One org per deployment / stack
+# You can set ORGANIZATION_ID as an env var in template.yml.
+# If it's not set, we default to "org_pilot" for your MVP.
+ORGANIZATION_ID = os.environ.get("ORGANIZATION_ID", "org_pilot")
+
 # Existing jobs table
 jobs_table = dynamodb.Table(os.environ["JOBS_TABLE"])
 
@@ -21,7 +26,7 @@ customers_table = dynamodb.Table(os.environ["CUSTOMERS_TABLE"])
 def lambda_handler(event, context):
     """
     API entry point for:
-      - GET  /hello
+      - GET  /hello (health check)
       - GET  /jobs
       - POST /jobs
       - GET  /customers
@@ -107,6 +112,7 @@ def create_customer(event):
 
     item = {
         "id": customer_id,
+        "organization_id": ORGANIZATION_ID,
         "full_name": full_name,
         "phone": phone,
         "email": body.get("email"),
@@ -132,13 +138,15 @@ def list_customers():
     """
     Simple list of customers. For MVP this is a plain scan.
     You can add pagination / filters later.
+    NOTE: Right now this returns all customers in this table.
+    Since this deployment is single-org, that's fine.
     """
     resp = customers_table.scan()
     items = resp.get("Items", [])
     return response(200, items)
 
 
-# ---------- JOBS (existing behavior kept for now) ----------
+# ---------- JOBS (existing behavior kept for now, with org_id added) ----------
 
 
 def create_job(event):
@@ -150,6 +158,7 @@ def create_job(event):
     job_id = str(uuid.uuid4())
     item = {
         "jobId": job_id,
+        "organization_id": ORGANIZATION_ID,
         "customerName": body.get("customerName"),
         "customerPhone": body.get("customerPhone"),
         "address": body.get("address"),
