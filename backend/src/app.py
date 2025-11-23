@@ -119,18 +119,15 @@ def create_customer(event):
         "full_name": full_name,
         "phone": phone,
         "email": body.get("email"),
-        "address_line1": body.get("address_line1"),
+        "address_line1": body.get("address_line1") or address,
         "address_line2": body.get("address_line2"),
-        "city": body.get("city"),
-        "state": body.get("state"),
-        "postal_code": body.get("postal_code"),
-        "country": body.get("country"),
         "is_business": is_business,
         "company_name": body.get("company_name"),
         "notes": body.get("notes") or "",
         "created_at": now,
         "updated_at": now,
     }
+
 
     customers_table.put_item(Item=item)
 
@@ -178,12 +175,8 @@ def get_or_create_customer(full_name: str, phone: str, address: str | None = Non
         "full_name": full_name,
         "phone": phone_norm,
         "email": None,
-        "address_line1": address,      # <--- use address here if provided
+        "address_line1": address,   # simplified
         "address_line2": None,
-        "city": None,
-        "state": None,
-        "postal_code": None,
-        "country": None,
         "is_business": False,
         "company_name": None,
         "notes": "",
