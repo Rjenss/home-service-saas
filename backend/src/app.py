@@ -2,7 +2,7 @@ import json
 import os
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 import boto3
 from boto3.dynamodb.conditions import Attr
@@ -102,7 +102,7 @@ def create_customer(event):
     if not phone:
         return response(400, {"message": "phone is required"})
 
-    now = datetime.utcnow().isoformat() + "Z"
+    now = now_utc_iso()
     customer_id = str(uuid.uuid4())
 
     is_business_raw = body.get("is_business")
@@ -146,11 +146,14 @@ def list_customers():
     return response(200, items)
 
 
-def get_or_create_customer(full_name: str, phone: str):
+def get_or_create_customer(full_name: str, phone: str, address: str | None = None):
     """
     Look up a customer by phone + organization.
     If found, return that customer.
     If not, create a new minimal customer record.
+
+    If address is provided and this is a new customer, store it
+    in address_line1. We leave city/state/etc as None for now.
     """
     phone_norm = (phone or "").strip()
 
@@ -166,7 +169,7 @@ def get_or_create_customer(full_name: str, phone: str):
         return customer
 
     # Not found -> create new minimal customer
-    now = datetime.utcnow().isoformat() + "Z"
+    now = now_utc_iso()
     customer_id = str(uuid.uuid4())
 
     customer = {
@@ -175,7 +178,7 @@ def get_or_create_customer(full_name: str, phone: str):
         "full_name": full_name,
         "phone": phone_norm,
         "email": None,
-        "address_line1": None,
+        "address_line1": address,      # <--- use address here if provided
         "address_line2": None,
         "city": None,
         "state": None,
@@ -192,6 +195,8 @@ def get_or_create_customer(full_name: str, phone: str):
     return customer
 
 
+
+
 # ---------- JOBS ----------
 
 
@@ -200,13 +205,12 @@ def create_job(event):
     Create a job from minimal UI data.
 
     Expected JSON body from frontend:
-
     {
       "customerName": "...",
       "customerPhone": "...",
       "address": "...",          # optional
-      "description": "...",      # problem description
-      "priority": "normal"       # optional
+      "description": "...",
+      "priority": "normal"
     }
     """
     try:
@@ -214,7 +218,6 @@ def create_job(event):
     except json.JSONDecodeError:
         return response(400, {"message": "Invalid JSON body"})
 
-    # Accept either camelCase or some alternative keys
     customer_name = body.get("customerName") or body.get("full_name")
     customer_phone = body.get("customerPhone") or body.get("phone")
     description = body.get("description") or body.get("problem") or ""
@@ -226,11 +229,11 @@ def create_job(event):
     if not customer_phone:
         return response(400, {"message": "customerPhone/phone is required"})
 
-    # Find or create the customer by phone
-    customer = get_or_create_customer(customer_name, customer_phone)
+    # Find or create the customer by phone, passing address so we can store it
+    customer = get_or_create_customer(customer_name, customer_phone, address)
     customer_id = customer["id"]
 
-    now = datetime.utcnow().isoformat() + "Z"
+    now = now_utc_iso()
     job_id = str(uuid.uuid4())
 
     item = {
@@ -248,8 +251,10 @@ def create_job(event):
     }
 
     jobs_table.put_item(Item=item)
-
     return response(201, item)
+
+def now_utc_iso():
+    return datetime.now(timezone.utc).isoformat()
 
 
 def list_jobs():
