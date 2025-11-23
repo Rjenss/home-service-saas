@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Simple API + Lambda + Jobs + Customers tables for MVP
+Description: Simple API + Lambda + Jobs + Customers + Technicians + JobVisits tables for MVP
 
 Globals:
   Function:
@@ -9,7 +9,7 @@ Globals:
     MemorySize: 128
 
 Resources:
-  # DynamoDB table to store jobs
+  # Jobs table
   JobsTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -24,7 +24,7 @@ Resources:
       SSESpecification:
         SSEEnabled: true
 
-  # DynamoDB table to store customers
+  # Customers table
   CustomersTable:
     Type: AWS::DynamoDB::Table
     Properties:
@@ -39,7 +39,37 @@ Resources:
       SSESpecification:
         SSEEnabled: true
 
-  # Explicit API Gateway so we can configure CORS
+  # Technicians table
+  TechniciansTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: TechniciansTable
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      SSESpecification:
+        SSEEnabled: true
+
+  # JobVisits table
+  JobVisitsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: JobVisitsTable
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: id
+          AttributeType: S
+      KeySchema:
+        - AttributeName: id
+          KeyType: HASH
+      SSESpecification:
+        SSEEnabled: true
+
+  # API Gateway
   ApiGateway:
     Type: AWS::Serverless::Api
     Properties:
@@ -58,11 +88,11 @@ Resources:
       CodeUri: .
       Environment:
         Variables:
-          JOBS_TABLE: !Ref JobsTable
-          CUSTOMERS_TABLE: !Ref CustomersTable
+          JOBS_TABLE:        !Ref JobsTable
+          CUSTOMERS_TABLE:   !Ref CustomersTable
           TECHNICIANS_TABLE: !Ref TechniciansTable
-          JOB_VISITS_TABLE: !Ref JobVisitsTable
-          ORGANIZATION_ID: org_pilot
+          JOB_VISITS_TABLE:  !Ref JobVisitsTable
+          ORGANIZATION_ID:   org_pilot
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref JobsTable
@@ -116,7 +146,7 @@ Resources:
             Path: /customers
             Method: post
 
-        # technicians endpoints
+        # Technicians endpoints
         TechniciansGet:
           Type: Api
           Properties:
@@ -130,14 +160,14 @@ Resources:
             Path: /technicians
             Method: post
 
-        # job_visits endpoints
-        job_visitsGet:
+        # JobVisits endpoints
+        JobVisitsGet:
           Type: Api
           Properties:
             RestApiId: !Ref ApiGateway
             Path: /job_visits
             Method: get
-        job_visitsPost:
+        JobVisitsPost:
           Type: Api
           Properties:
             RestApiId: !Ref ApiGateway
