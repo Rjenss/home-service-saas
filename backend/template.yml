@@ -60,12 +60,18 @@ Resources:
         Variables:
           JOBS_TABLE: !Ref JobsTable
           CUSTOMERS_TABLE: !Ref CustomersTable
+          TECHNICIANS_TABLE: !Ref TechniciansTable
+          JOB_VISITS_TABLE: !Ref JobVisitsTable
           ORGANIZATION_ID: org_pilot
       Policies:
         - DynamoDBCrudPolicy:
             TableName: !Ref JobsTable
         - DynamoDBCrudPolicy:
             TableName: !Ref CustomersTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref TechniciansTable
+        - DynamoDBCrudPolicy:
+            TableName: !Ref JobVisitsTable
       Events:
         # Root path - so GET / works
         RootGet:
@@ -108,6 +114,34 @@ Resources:
           Properties:
             RestApiId: !Ref ApiGateway
             Path: /customers
+            Method: post
+
+        # technicians endpoints
+        TechniciansGet:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /technicians
+            Method: get
+        TechniciansPost:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /technicians
+            Method: post
+
+        # job_visits endpoints
+        job_visitsGet:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /job_visits
+            Method: get
+        job_visitsPost:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /job_visits
             Method: post
 
 Outputs:

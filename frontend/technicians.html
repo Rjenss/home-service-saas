@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Technicians - Field Service Portal</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Technicians</h1>
+    <nav>
+      <a href="index.html">Portal Home</a>
+      <a href="internal-job.html">Create Job</a>
+      <a href="calendar.html">Calendar</a>
+    </nav>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Add Technician</h2>
+      <form id="techForm">
+        <label>
+          First Name
+          <input type="text" id="firstName" required />
+        </label>
+
+        <label>
+          Last Name
+          <input type="text" id="lastName" />
+        </label>
+
+        <label>
+          Phone
+          <input type="text" id="phone" required />
+        </label>
+
+        <label>
+          Email
+          <input type="email" id="email" />
+        </label>
+
+        <label>
+          Skills (comma-separated)
+          <input type="text" id="skillTags" placeholder="PANEL_UPGRADE,EV_CHARGER" />
+        </label>
+
+        <button type="submit">Save Technician</button>
+      </form>
+      <div id="techFormStatus" class="status"></div>
+    </section>
+
+    <section class="card">
+      <h2>Existing Technicians</h2>
+      <div id="techList">Loading technicians...</div>
+    </section>
+  </main>
+
+  <script>
+    // Keep this in sync with your app.js API base URL
+    const API_BASE_URL = "https://fdho6lafwk.execute-api.us-east-2.amazonaws.com/Prod";
+
+    function getApiBaseUrl() {
+      return API_BASE_URL.replace(/\/+$/, "");
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const techForm = document.getElementById("techForm");
+      const techFormStatus = document.getElementById("techFormStatus");
+      const techListEl = document.getElementById("techList");
+
+      loadTechnicians();
+
+      techForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const baseUrl = getApiBaseUrl();
+        if (!baseUrl) {
+          techFormStatus.textContent = "API base URL is not set.";
+          return;
+        }
+
+        const payload = {
+          first_name: document.getElementById("firstName").value.trim(),
+          last_name: document.getElementById("lastName").value.trim(),
+          phone: document.getElementById("phone").value.trim(),
+          email: document.getElementById("email").value.trim() || null,
+          skill_tags: document.getElementById("skillTags").value.trim() || null,
+        };
+
+        if (!payload.first_name) {
+          techFormStatus.textContent = "First name is required.";
+          return;
+        }
+        if (!payload.phone) {
+          techFormStatus.textContent = "Phone is required.";
+          return;
+        }
+
+        techFormStatus.textContent = "Saving technician...";
+
+        try {
+          const res = await fetch(`${baseUrl}/technicians`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          });
+
+          const text = await res.text();
+          if (!res.ok) {
+            techFormStatus.textContent = `Error: ${res.status} ${text}`;
+            return;
+          }
+
+          techFormStatus.textContent = "Technician saved.";
+          techForm.reset();
+          await loadTechnicians();
+        } catch (err) {
+          techFormStatus.textContent = `Error: ${String(err)}`;
+        }
+      });
+
+      async function loadTechnicians() {
+        const baseUrl = getApiBaseUrl();
+        if (!baseUrl) {
+          techListEl.textContent = "API base URL is not set.";
+          return;
+        }
+
+        techListEl.textContent = "Loading technicians...";
+
+        try {
+          const res = await fetch(`${baseUrl}/technicians`, {
+            method: "GET",
+          });
+
+          const text = await res.text();
+          if (!res.ok) {
+            techListEl.textContent = `Error: ${res.status} ${text}`;
+            return;
+          }
+
+          const technicians = JSON.parse(text);
+          renderTechnicians(technicians);
+        } catch (err) {
+          techListEl.textContent = `Error loading technicians: ${String(err)}`;
+        }
+      }
+
+      function renderTechnicians(techs) {
+        techListEl.innerHTML = "";
+
+        if (!techs || techs.length === 0) {
+          techListEl.textContent = "No technicians yet.";
+          return;
+        }
+
+        for (const tech of techs) {
+          const div = document.createElement("div");
+          div.className = "tech-card";
+          div.innerHTML = `
+            <strong>${tech.first_name || ""} ${tech.last_name || ""}</strong><br/>
+            Phone: ${tech.phone || ""}<br/>
+            Email: ${tech.email || ""}<br/>
+            Skills: ${tech.skill_tags || ""}
+          `;
+          techListEl.appendChild(div);
+        }
+      }
+    });
+  </script>
+</body>
+</html>

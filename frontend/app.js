@@ -20,6 +20,8 @@ document.addEventListener("DOMContentLoaded", () => {
       customerPhone: document.getElementById("customerPhone").value.trim(),
       address: document.getElementById("address").value.trim(),
       description: document.getElementById("description").value.trim(),
+      date: document.getElementById("date").value.trim(),
+      time: document.getElementById("time").value.trim(),
       priority: document.getElementById("priority").value,
     };
 

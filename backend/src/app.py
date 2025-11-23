@@ -17,17 +17,23 @@ ORGANIZATION_ID = os.environ.get("ORGANIZATION_ID", "org_pilot")
 
 jobs_table = dynamodb.Table(os.environ["JOBS_TABLE"])
 customers_table = dynamodb.Table(os.environ["CUSTOMERS_TABLE"])
+technicians_table = dynamodb.Table(os.environ["TECHNICIANS_TABLE"])
+job_visits_table = dynamodb.Table(os.environ["JOB_VISITS_TABLE"])
 
 
 def lambda_handler(event, context):
     """
     API entry point for:
-      - GET  /          (root)
-      - GET  /hello     (health check)
+      - GET  /              (root)
+      - GET  /hello         (health check)
       - GET  /jobs
       - POST /jobs
       - GET  /customers
       - POST /customers
+      - GET  /technicians
+      - POST /technicians
+      - GET  /job_visits
+      - POST /job_visits
     """
     logger.info("Event: %s", json.dumps(event))
 
@@ -38,32 +44,55 @@ def lambda_handler(event, context):
     if path in ("", "/") and method == "GET":
         return response(200, {
             "message": "Field Service API - root",
-            "endpoints": ["/hello", "/jobs", "/customers"],
+            "endpoints": [
+                "/hello",
+                "/jobs",
+                "/customers",
+                "/technicians",
+                "/job_visits",
+            ],
         })
 
     # Simple health/check endpoint
     if path == "/hello" and method == "GET":
         return response(200, "Ryan's Lambda")
 
-    # Customer endpoints (customer web UI / inbound call flow)
+    # Customer endpoints
     if path == "/customers" and method == "POST":
         return create_customer(event)
-
     if path == "/customers" and method == "GET":
         return list_customers()
 
-    # Jobs endpoints (internal / dispatcher or simple UI)
+    # Job endpoints
     if path == "/jobs" and method == "POST":
         return create_job(event)
-
     if path == "/jobs" and method == "GET":
         return list_jobs()
+
+    # Technician endpoints (internal admin UI)
+    if path == "/technicians" and method == "POST":
+        return create_technician(event)
+    if path == "/technicians" and method == "GET":
+        return list_technicians()
+
+    # Job visit endpoints (calendar will use these)
+    if path == "/job_visits" and method == "POST":
+        return create_job_visit(event)
+    if path == "/job_visits" and method == "GET":
+        return list_job_visits()
 
     # OPTIONS for CORS preflight
     if method == "OPTIONS":
         return response(200, "", extra_headers={})
 
     return response(404, {"message": "Not found"})
+
+
+# ---------- TIME HELPERS ----------
+
+
+def now_utc_iso() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 # ---------- CUSTOMERS ----------
@@ -80,10 +109,6 @@ def create_customer(event):
       "email": "...",
       "address_line1": "...",
       "address_line2": "...",
-      "city": "...",
-      "state": "...",
-      "postal_code": "...",
-      "country": "...",
       "is_business": true/false,
       "company_name": "...",
       "notes": "..."
@@ -119,7 +144,7 @@ def create_customer(event):
         "full_name": full_name,
         "phone": phone,
         "email": body.get("email"),
-        "address_line1": body.get("address_line1") or address,
+        "address_line1": body.get("address_line1"),
         "address_line2": body.get("address_line2"),
         "is_business": is_business,
         "company_name": body.get("company_name"),
@@ -128,14 +153,12 @@ def create_customer(event):
         "updated_at": now,
     }
 
-
     customers_table.put_item(Item=item)
 
     return response(201, item)
 
 
 def list_customers():
-    """For MVP this is a plain scan; later we can paginate or filter."""
     resp = customers_table.scan(
         FilterExpression=Attr("organization_id").eq(ORGANIZATION_ID)
     )
@@ -150,22 +173,19 @@ def get_or_create_customer(full_name: str, phone: str, address: str | None = Non
     If not, create a new minimal customer record.
 
     If address is provided and this is a new customer, store it
-    in address_line1. We leave city/state/etc as None for now.
+    in address_line1.
     """
     phone_norm = (phone or "").strip()
 
-    # Small-scale MVP: use a scan. Later, add a GSI on phone.
     resp = customers_table.scan(
         FilterExpression=Attr("organization_id").eq(ORGANIZATION_ID)
-                          & Attr("phone").eq(phone_norm)
+        & Attr("phone").eq(phone_norm)
     )
     items = resp.get("Items", [])
 
     if items:
-        customer = items[0]
-        return customer
+        return items[0]
 
-    # Not found -> create new minimal customer
     now = now_utc_iso()
     customer_id = str(uuid.uuid4())
 
@@ -175,7 +195,7 @@ def get_or_create_customer(full_name: str, phone: str, address: str | None = Non
         "full_name": full_name,
         "phone": phone_norm,
         "email": None,
-        "address_line1": address,   # simplified
+        "address_line1": address,
         "address_line2": None,
         "is_business": False,
         "company_name": None,
@@ -186,8 +206,6 @@ def get_or_create_customer(full_name: str, phone: str, address: str | None = Non
 
     customers_table.put_item(Item=customer)
     return customer
-
-
 
 
 # ---------- JOBS ----------
@@ -203,7 +221,9 @@ def create_job(event):
       "customerPhone": "...",
       "address": "...",          # optional
       "description": "...",
-      "priority": "normal"
+      "priority": "normal",
+      "date": "2025-11-24",      # requested date (string)
+      "time": "14:30"            # requested time (string, 24h)
     }
     """
     try:
@@ -216,6 +236,8 @@ def create_job(event):
     description = body.get("description") or body.get("problem") or ""
     address = body.get("address")
     priority = body.get("priority", "normal")
+    date_str = body.get("date")   # keep as simple string for now
+    time_str = body.get("time")   # keep as simple string for now
 
     if not customer_name:
         return response(400, {"message": "customerName/full_name is required"})
@@ -229,7 +251,7 @@ def create_job(event):
     now = now_utc_iso()
     job_id = str(uuid.uuid4())
 
-    item = {
+    job_item = {
         "jobId": job_id,
         "organization_id": ORGANIZATION_ID,
         "customer_id": customer_id,
@@ -239,19 +261,194 @@ def create_job(event):
         "description": description,
         "status": "new",
         "priority": priority,
+        "requested_date": date_str,
+        "requested_time": time_str,
         "created_at": now,
         "updated_at": now,
     }
 
-    jobs_table.put_item(Item=item)
-    return response(201, item)
+    jobs_table.put_item(Item=job_item)
 
-def now_utc_iso():
-    return datetime.now(timezone.utc).isoformat()
+    # Also create an initial Job Visit (no technician assigned yet)
+    visit_item = create_initial_job_visit_for_job(
+        job_id=job_id,
+        date_str=date_str,
+        time_str=time_str,
+        notes=description,
+    )
+
+    # Return both job and visit so the UI has everything if needed
+    return response(201, {"job": job_item, "job_visit": visit_item})
 
 
 def list_jobs():
     resp = jobs_table.scan(
+        FilterExpression=Attr("organization_id").eq(ORGANIZATION_ID)
+    )
+    items = resp.get("Items", [])
+    return response(200, items)
+
+
+# ---------- JOB VISITS ----------
+
+
+def create_initial_job_visit_for_job(
+    job_id: str,
+    date_str: str | None,
+    time_str: str | None,
+    notes: str | None = "",
+):
+    """
+    Helper to create a single initial visit when the job is created.
+    For now, technician_id is None (unassigned), and we just store
+    date/time as provided plus a simple combined string.
+    """
+    now = now_utc_iso()
+    visit_id = str(uuid.uuid4())
+
+    # Simple combined string for display; you can improve later
+    if date_str and time_str:
+        scheduled_display = f"{date_str} {time_str}"
+    elif date_str:
+        scheduled_display = date_str
+    else:
+        scheduled_display = None
+
+    item = {
+        "id": visit_id,
+        "organization_id": ORGANIZATION_ID,
+        "job_id": job_id,
+        "technician_id": None,          # assign later from calendar
+        "scheduled_date": date_str,
+        "scheduled_time": time_str,
+        "scheduled_display": scheduled_display,
+        "status": "scheduled",
+        "notes": notes or "",
+        "created_at": now,
+        "updated_at": now,
+    }
+
+    job_visits_table.put_item(Item=item)
+    return item
+
+
+def create_job_visit(event):
+    """
+    Direct endpoint for creating a job visit (will be used by calendar UI).
+
+    Expected JSON:
+    {
+      "job_id": "...",
+      "technician_id": "...",    # optional for now
+      "scheduled_date": "2025-11-24",
+      "scheduled_time": "14:30",
+      "status": "scheduled",
+      "notes": "..."
+    }
+    """
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except json.JSONDecodeError:
+        return response(400, {"message": "Invalid JSON body"})
+
+    job_id = body.get("job_id")
+    technician_id = body.get("technician_id")
+    scheduled_date = body.get("scheduled_date")
+    scheduled_time = body.get("scheduled_time")
+    status = body.get("status", "scheduled")
+    notes = body.get("notes") or ""
+
+    if not job_id:
+        return response(400, {"message": "job_id is required"})
+
+    now = now_utc_iso()
+    visit_id = str(uuid.uuid4())
+
+    if scheduled_date and scheduled_time:
+        scheduled_display = f"{scheduled_date} {scheduled_time}"
+    elif scheduled_date:
+        scheduled_display = scheduled_date
+    else:
+        scheduled_display = None
+
+    item = {
+        "id": visit_id,
+        "organization_id": ORGANIZATION_ID,
+        "job_id": job_id,
+        "technician_id": technician_id,
+        "scheduled_date": scheduled_date,
+        "scheduled_time": scheduled_time,
+        "scheduled_display": scheduled_display,
+        "status": status,
+        "notes": notes,
+        "created_at": now,
+        "updated_at": now,
+    }
+
+    job_visits_table.put_item(Item=item)
+    return response(201, item)
+
+
+def list_job_visits():
+    resp = job_visits_table.scan(
+        FilterExpression=Attr("organization_id").eq(ORGANIZATION_ID)
+    )
+    items = resp.get("Items", [])
+    return response(200, items)
+
+
+# ---------- TECHNICIANS ----------
+
+
+def create_technician(event):
+    """
+    Create a technician record.
+
+    Expected JSON:
+    {
+      "first_name": "...",
+      "last_name": "...",
+      "phone": "...",
+      "email": "...",
+      "skill_tags": "PANEL_UPGRADE,EV_CHARGER"
+    }
+    """
+    try:
+        body = json.loads(event.get("body") or "{}")
+    except json.JSONDecodeError:
+        return response(400, {"message": "Invalid JSON body"})
+
+    first_name = (body.get("first_name") or "").strip()
+    last_name = (body.get("last_name") or "").strip()
+    phone = (body.get("phone") or "").strip()
+
+    if not first_name:
+        return response(400, {"message": "first_name is required"})
+    if not phone:
+        return response(400, {"message": "phone is required"})
+
+    now = now_utc_iso()
+    tech_id = str(uuid.uuid4())
+
+    item = {
+        "id": tech_id,
+        "organization_id": ORGANIZATION_ID,
+        "first_name": first_name,
+        "last_name": last_name,
+        "phone": phone,
+        "email": body.get("email"),
+        "skill_tags": body.get("skill_tags"),
+        "active": True,
+        "created_at": now,
+        "updated_at": now,
+    }
+
+    technicians_table.put_item(Item=item)
+    return response(201, item)
+
+
+def list_technicians():
+    resp = technicians_table.scan(
         FilterExpression=Attr("organization_id").eq(ORGANIZATION_ID)
     )
     items = resp.get("Items", [])
