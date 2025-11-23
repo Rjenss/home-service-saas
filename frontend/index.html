@@ -2,57 +2,25 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Field Service Dashboard</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link rel="stylesheet" href="style.css" />
+  <title>Field Service Portal</title>
+  <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
-  <header>
-    <h1>Field Service Dashboard</h1>
-    <p>Internal tool to create service jobs.</p>
+  <header class="site-header">
+    <h1>Field Service Portal</h1>
+    <p>Choose a workspace.</p>
   </header>
 
-  <main>
-    <!-- SECTION: Create job -->
-    <section class="card">
-      <h2>Create Job</h2>
-      <p>Submit a new job. It will be stored in the backend database.</p>
-      <form id="jobForm">
-        <div class="field">
-          <label for="customerName">Customer name</label>
-          <input id="customerName" name="customerName" required />
-        </div>
+  <main class="portal-grid">
+    <a class="portal-card" href="public-job.html">
+      <h2>Customer Job Creation</h2>
+      <p>Simple form for customers or office staff to submit new jobs.</p>
+    </a>
 
-        <div class="field">
-          <label for="customerPhone">Customer phone</label>
-          <input id="customerPhone" name="customerPhone" />
-        </div>
-
-        <div class="field">
-          <label for="address">Address</label>
-          <input id="address" name="address" />
-        </div>
-
-        <div class="field">
-          <label for="description">Problem description</label>
-          <textarea id="description" name="description" rows="3"></textarea>
-        </div>
-
-        <div class="field">
-          <label for="priority">Priority</label>
-          <select id="priority" name="priority">
-            <option value="normal">Normal</option>
-            <option value="urgent">Urgent</option>
-            <option value="emergency">Emergency</option>
-          </select>
-        </div>
-
-        <button type="submit">Create Job</button>
-      </form>
-      <div id="jobFormStatus" class="status"></div>
-    </section>
+    <a class="portal-card" href="calendar.html">
+      <h2>Jobs Calendar</h2>
+      <p>Internal view of upcoming jobs for technicians and dispatch.</p>
+    </a>
   </main>
-
-  <script src="app.js"></script>
 </body>
 </html>

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Create Job</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <h1>Request Electrical Service</h1>
+    <p>Provide your name, phone, address, and a short description.</p>
+  </header>
+
+  <main>
+    <form id="jobForm" class="job-form">
+      <label>
+        Name
+        <input id="customerName" name="customerName" required />
+      </label>
+
+      <label>
+        Phone
+        <input id="customerPhone" name="customerPhone" required />
+      </label>
+
+      <label>
+        Address
+        <input id="address" name="address" />
+      </label>
+
+      <label>
+        Problem description
+        <textarea id="description" name="description"></textarea>
+      </label>
+
+      <label>
+        Priority
+        <select id="priority" name="priority">
+          <option value="normal">Normal</option>
+          <option value="high">High</option>
+          <option value="emergency">Emergency</option>
+        </select>
+      </label>
+
+      <button type="submit">Submit Job</button>
+    </form>
+
+    <p id="jobFormStatus"></p>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>
