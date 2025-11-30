@@ -14,76 +14,57 @@ document.addEventListener("DOMContentLoaded", () => {
   const nextDayBtn = document.getElementById("nextDayBtn");
 
   let allVisits = [];
-  const todayIso = getTodayDateCST();     // baseline, "YYYY-MM-DD"
-  let dayOffset = 0;                      // 0 = today, -1 = yesterday, +1 = tomorrow
+  let selectedDate = getTodayIso(); // "YYYY-MM-DD" in your local time (CST/CDT for you)
 
   init();
 
   function init() {
     updateCurrentDayLabel();
     if (prevDayBtn) {
-      prevDayBtn.addEventListener("click", () => changeDay(-1));
+      prevDayBtn.addEventListener("click", () => {
+        changeDay(-1);
+      });
     }
     if (nextDayBtn) {
-      nextDayBtn.addEventListener("click", () => changeDay(1));
+      nextDayBtn.addEventListener("click", () => {
+        changeDay(1);
+      });
     }
     loadJobVisitsForCalendar();
   }
 
-  // Get today's date in CST as "YYYY-MM-DD"
-  function getTodayDateCST() {
+  // Today in local time as "YYYY-MM-DD"
+  function getTodayIso() {
     const now = new Date();
-    const formatter = new Intl.DateTimeFormat("en-CA", {
-      timeZone: TIMEZONE,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-    const parts = formatter.formatToParts(now);
-    const year = parts.find(p => p.type === "year").value;
-    const month = parts.find(p => p.type === "month").value;
-    const day = parts.find(p => p.type === "day").value;
-    return `${year}-${month}-${day}`;
-  }
-
-  // Convert "YYYY-MM-DD" to a Date in UTC
-  function isoToDate(iso) {
-    const [y, m, d] = iso.split("-").map(Number);
-    return new Date(Date.UTC(y, m - 1, d));
-  }
-
-  // Convert Date in UTC back to "YYYY-MM-DD"
-  function dateToIsoUTC(date) {
-    const y = date.getUTCFullYear();
-    const m = String(date.getUTCMonth() + 1).padStart(2, "0");
-    const d = String(date.getUTCDate()).padStart(2, "0");
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, "0");
+    const d = String(now.getDate()).padStart(2, "0");
     return `${y}-${m}-${d}`;
   }
 
-  // Return the currently selected ISO date based on baseline + offset
-  function getSelectedIsoDate() {
-    const baseDate = isoToDate(todayIso);
-    baseDate.setUTCDate(baseDate.getUTCDate() + dayOffset);
-    return dateToIsoUTC(baseDate);
-  }
-
-  // Move selected date by offset days (-1 = previous, 1 = next)
+  // Move selected date by offset days (-1 = previous, +1 = next)
   function changeDay(offset) {
-    dayOffset += offset;
+    const [y, m, d] = selectedDate.split("-").map(Number);
+    const date = new Date(y, m - 1, d); // local date
+    date.setDate(date.getDate() + offset);
+
+    const newY = date.getFullYear();
+    const newM = String(date.getMonth() + 1).padStart(2, "0");
+    const newD = String(date.getDate()).padStart(2, "0");
+    selectedDate = `${newY}-${newM}-${newD}`;
+
     updateCurrentDayLabel();
     renderVisitsForSelectedDay();
   }
 
-  // Friendly label for currently selected day
+  // Update the big label at the top
   function updateCurrentDayLabel() {
     if (!currentDayLabelEl) return;
 
-    const isoDate = getSelectedIsoDate();
-    const [y, m, d] = isoDate.split("-").map(Number);
-    const date = new Date(Date.UTC(y, m - 1, d));
+    const [y, m, d] = selectedDate.split("-").map(Number);
+    const date = new Date(y, m - 1, d);
 
     const formatter = new Intl.DateTimeFormat("en-US", {
-      timeZone: TIMEZONE,
       weekday: "long",
       month: "short",
       day: "numeric",
@@ -132,11 +113,9 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!calendarEl) return;
     calendarEl.innerHTML = "";
 
-    const isoDate = getSelectedIsoDate();
-
     // Filter to the selected date
     const visits = allVisits
-      .filter(v => v.scheduled_date === isoDate)
+      .filter(v => v.scheduled_date === selectedDate)
       .sort((a, b) => {
         const ta = (a.scheduled_time || "").padStart(5, "9");
         const tb = (b.scheduled_time || "").padStart(5, "9");
@@ -147,9 +126,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (statusEl) {
       if (!visits.length) {
-        statusEl.textContent = `No visits scheduled for ${isoDate}.`;
+        statusEl.textContent = `No visits scheduled for ${selectedDate}.`;
       } else {
-        statusEl.textContent = `Showing ${visits.length} visit(s) for ${isoDate}.`;
+        statusEl.textContent = `Showing ${visits.length} visit(s) for ${selectedDate}.`;
       }
     }
 
@@ -161,7 +140,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Group by technician so dispatcher can see who is doing what
+    // Group by technician
     const byTech = {};
     for (const visit of visits) {
       const techLabel =
