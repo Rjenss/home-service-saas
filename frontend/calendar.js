@@ -14,12 +14,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const nextDayBtn = document.getElementById("nextDayBtn");
 
   let allVisits = [];
-  let selectedDate = getTodayDateCST(); // "YYYY-MM-DD"
+  const todayIso = getTodayDateCST();     // baseline, "YYYY-MM-DD"
+  let dayOffset = 0;                      // 0 = today, -1 = yesterday, +1 = tomorrow
 
   init();
 
   function init() {
-    updateCurrentDayLabel(selectedDate);
+    updateCurrentDayLabel();
     if (prevDayBtn) {
       prevDayBtn.addEventListener("click", () => changeDay(-1));
     }
@@ -45,11 +46,13 @@ document.addEventListener("DOMContentLoaded", () => {
     return `${year}-${month}-${day}`;
   }
 
+  // Convert "YYYY-MM-DD" to a Date in UTC
   function isoToDate(iso) {
     const [y, m, d] = iso.split("-").map(Number);
     return new Date(Date.UTC(y, m - 1, d));
   }
 
+  // Convert Date in UTC back to "YYYY-MM-DD"
   function dateToIsoUTC(date) {
     const y = date.getUTCFullYear();
     const m = String(date.getUTCMonth() + 1).padStart(2, "0");
@@ -57,22 +60,25 @@ document.addEventListener("DOMContentLoaded", () => {
     return `${y}-${m}-${d}`;
   }
 
+  // Return the currently selected ISO date based on baseline + offset
+  function getSelectedIsoDate() {
+    const baseDate = isoToDate(todayIso);
+    baseDate.setUTCDate(baseDate.getUTCDate() + dayOffset);
+    return dateToIsoUTC(baseDate);
+  }
+
   // Move selected date by offset days (-1 = previous, 1 = next)
   function changeDay(offset) {
-    const date = isoToDate(selectedDate);
-    date.setUTCDate(date.getUTCDate() + offset);
-    selectedDate = dateToIsoUTC(date);
-    updateCurrentDayLabel(selectedDate);
+    dayOffset += offset;
+    updateCurrentDayLabel();
     renderVisitsForSelectedDay();
   }
 
   // Friendly label for currently selected day
-  function updateCurrentDayLabel(isoDate) {
+  function updateCurrentDayLabel() {
     if (!currentDayLabelEl) return;
-    if (!isoDate) {
-      currentDayLabelEl.textContent = "Unscheduled";
-      return;
-    }
+
+    const isoDate = getSelectedIsoDate();
     const [y, m, d] = isoDate.split("-").map(Number);
     const date = new Date(Date.UTC(y, m - 1, d));
 
@@ -113,14 +119,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const data = await resp.json();
       allVisits = Array.isArray(data) ? data : [];
 
-      if (statusEl) {
-        if (!allVisits.length) {
-          statusEl.textContent = "No job visits found.";
-        } else {
-          statusEl.textContent = `Loaded ${allVisits.length} job visits.`;
-        }
-      }
-
       renderVisitsForSelectedDay();
     } catch (err) {
       console.error("Error loading job visits:", err);
@@ -134,16 +132,11 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!calendarEl) return;
     calendarEl.innerHTML = "";
 
-    if (!selectedDate) {
-      const msg = document.createElement("p");
-      msg.textContent = "No day selected.";
-      calendarEl.appendChild(msg);
-      return;
-    }
+    const isoDate = getSelectedIsoDate();
 
     // Filter to the selected date
     const visits = allVisits
-      .filter(v => v.scheduled_date === selectedDate)
+      .filter(v => v.scheduled_date === isoDate)
       .sort((a, b) => {
         const ta = (a.scheduled_time || "").padStart(5, "9");
         const tb = (b.scheduled_time || "").padStart(5, "9");
@@ -151,6 +144,14 @@ document.addEventListener("DOMContentLoaded", () => {
         if (ta > tb) return 1;
         return 0;
       });
+
+    if (statusEl) {
+      if (!visits.length) {
+        statusEl.textContent = `No visits scheduled for ${isoDate}.`;
+      } else {
+        statusEl.textContent = `Showing ${visits.length} visit(s) for ${isoDate}.`;
+      }
+    }
 
     if (!visits.length) {
       const msg = document.createElement("p");
