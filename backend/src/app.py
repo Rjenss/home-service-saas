@@ -332,18 +332,19 @@ def create_initial_job_visit_for_job(
     return item
 
 
-def create_job_visit(event):
+def create_job(event):
     """
-    Direct endpoint for creating a job visit (will be used by calendar UI).
+    Create a job from minimal UI data.
 
-    Expected JSON:
+    Expected JSON body from frontend:
     {
-      "job_id": "...",
-      "technician_id": "...",    # optional for now
-      "scheduled_date": "2025-11-24",
-      "scheduled_time": "14:30",
-      "status": "scheduled",
-      "notes": "..."
+      "customerName": "...",
+      "customerPhone": "...",
+      "address": "...",          # optional
+      "description": "...",
+      "priority": "normal",
+      "date": "2025-11-24",      # requested date (string)
+      "time": "14:30"            # requested time (string, 24h)
     }
     """
     try:
@@ -351,42 +352,62 @@ def create_job_visit(event):
     except json.JSONDecodeError:
         return response(400, {"message": "Invalid JSON body"})
 
-    job_id = body.get("job_id")
-    technician_id = body.get("technician_id")
-    scheduled_date = body.get("scheduled_date")
-    scheduled_time = body.get("scheduled_time")
-    status = body.get("status", "scheduled")
-    notes = body.get("notes") or ""
+    customer_name = body.get("customerName") or body.get("full_name")
+    customer_phone = body.get("customerPhone") or body.get("phone")
+    description = body.get("description") or body.get("problem") or ""
+    address = body.get("address")
+    priority = body.get("priority", "normal")
+    date_str = body.get("date")    # keep as simple string for now
+    time_str = body.get("time")    # keep as simple string for now
 
-    if not job_id:
-        return response(400, {"message": "job_id is required"})
+    if not customer_name:
+        return response(400, {"message": "customerName/full_name is required"})
+    if not customer_phone:
+        return response(400, {"message": "customerPhone/phone is required"})
+
+    # Find or create the customer by phone, passing address so we can store it
+    customer = get_or_create_customer(customer_name, customer_phone, address)
+    customer_id = customer["id"]
 
     now = now_utc_iso()
-    visit_id = str(uuid.uuid4())
+    job_id = str(uuid.uuid4())
 
-    if scheduled_date and scheduled_time:
-        scheduled_display = f"{scheduled_date} {scheduled_time}"
-    elif scheduled_date:
-        scheduled_display = scheduled_date
+    # New: derive job status from presence of date and time
+    if date_str and time_str:
+        job_status = "Scheduled"
     else:
-        scheduled_display = None
+        job_status = "Unscheduled"
 
-    item = {
-        "id": visit_id,
+    job_item = {
+        "jobId": job_id,
         "organization_id": ORGANIZATION_ID,
-        "job_id": job_id,
-        "technician_id": technician_id,
-        "scheduled_date": scheduled_date,
-        "scheduled_time": scheduled_time,
-        "scheduled_display": scheduled_display,
-        "status": status,
-        "notes": notes,
+        "customer_id": customer_id,
+        "customerName": customer_name,
+        "customerPhone": customer_phone,
+        "address": address,
+        "description": description,
+        "status": job_status,
+        "priority": priority,
+        "requested_date": date_str,
+        "requested_time": time_str,
         "created_at": now,
         "updated_at": now,
     }
 
-    job_visits_table.put_item(Item=item)
-    return response(201, item)
+    jobs_table.put_item(Item=job_item)
+
+    # New: only create an initial Job Visit if the job is scheduled
+    visit_item = None
+    if job_status == "Scheduled":
+        visit_item = create_initial_job_visit_for_job(
+            job_id=job_id,
+            date_str=date_str,
+            time_str=time_str,
+            notes=description,
+        )
+
+    # Return both job and visit so the UI has everything if needed
+    return response(201, {"job": job_item, "job_visit": visit_item})
 
 
 def list_job_visits():
