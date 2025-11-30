@@ -2,64 +2,71 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Jobs Calendar</title>
+  <title>Jobs calendar</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+<body class="page">
   <header class="site-header">
-    <h1>Jobs Calendar</h1>
-    <p>Internal calendar of scheduled job visits.</p>
-    <nav>
-      <a href="index.html">Back to portal</a>
-      <a href="public-job.html">Create job</a>
-      <a href="technicians.html">Manage technicians</a>
-    </nav>
+    <div class="site-header-inner">
+      <div class="brand">
+        <span class="brand-mark">T</span>
+        <div class="brand-text">
+          <span class="brand-name">Technisend</span>
+          <span class="brand-subtitle">Schedule board</span>
+        </div>
+      </div>
+      <nav class="site-nav">
+        <a href="index.html">Portal</a>
+        <a href="public-job.html">Create job</a>
+        <a href="technicians.html">Technicians</a>
+      </nav>
+    </div>
   </header>
 
-  <main class="calendar-layout">
-    <section class="calendar-controls">
-      <div class="calendar-controls-row">
+  <main class="shell">
+    <section class="panel panel-hero">
+      <div class="panel-body hero-body hero-body-calendar">
         <div>
-          <h2>Schedule</h2>
-          <p class="calendar-subtitle">
-            View technician job visits one day at a time.
+          <h1 class="hero-title">Jobs calendar</h1>
+          <p class="hero-subtitle">
+            See today’s scheduled visits by technician. Step forward and back one day at a time.
           </p>
         </div>
-        <div class="calendar-today-info">
-          <div class="calendar-day-nav">
-            <button
-              id="prevDayBtn"
-              class="day-nav-button"
-              type="button"
-              aria-label="Previous day"
-            >
-              &#8592;
-            </button>
+        <div class="calendar-day-nav">
+          <button
+            id="prevDayBtn"
+            class="day-nav-button"
+            type="button"
+            aria-label="Previous day"
+          >
+            ←
+          </button>
 
-            <div
-              id="calendarCurrentDayLabel"
-              class="calendar-current-day"
-            ></div>
+          <div id="calendarCurrentDayLabel" class="calendar-current-day"></div>
 
-            <button
-              id="nextDayBtn"
-              class="day-nav-button"
-              type="button"
-              aria-label="Next day"
-            >
-              &#8594;
-            </button>
-          </div>
-          <div class="calendar-timezone">
-            Times shown in Central Time (CST/CDT)
-          </div>
+          <button
+            id="nextDayBtn"
+            class="day-nav-button"
+            type="button"
+            aria-label="Next day"
+          >
+            →
+          </button>
         </div>
       </div>
     </section>
 
-    <section class="calendar-content">
-      <div id="calendarStatus" class="calendar-status"></div>
-      <div id="calendarJobs" class="calendar-jobs-list"></div>
+    <section class="panel">
+      <div class="panel-body">
+        <div class="calendar-header-row">
+          <div class="calendar-timezone">
+            Times shown in Central time
+          </div>
+          <div id="calendarStatus" class="calendar-status"></div>
+        </div>
+
+        <div id="calendarJobs" class="calendar-jobs-list"></div>
+      </div>
     </section>
   </main>
 

@@ -2,56 +2,119 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Create Job</title>
+  <title>Create job</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
+<body class="page">
   <header class="site-header">
-    <h1>Request Electrical Service</h1>
-    <p>Provide your name, phone, address, and a short description.</p>
+    <div class="site-header-inner">
+      <div class="brand">
+        <span class="brand-mark">T</span>
+        <div class="brand-text">
+          <span class="brand-name">Technisend</span>
+          <span class="brand-subtitle">Job intake</span>
+        </div>
+      </div>
+      <nav class="site-nav">
+        <a href="index.html">Portal</a>
+        <a href="calendar.html">Calendar</a>
+        <a href="technicians.html">Technicians</a>
+      </nav>
+    </div>
   </header>
 
-  <main>
-    <form id="jobForm" class="job-form">
-      <label>
-        Name
-        <input id="customerName" name="customerName" required />
-      </label>
+  <main class="shell">
+    <section class="panel panel-hero">
+      <div class="panel-body hero-body">
+        <div>
+          <h1 class="hero-title">Request service</h1>
+          <p class="hero-subtitle">
+            Capture exactly what the customer needs so the dispatcher can schedule the right technician.
+          </p>
+        </div>
+      </div>
+    </section>
 
-      <label>
-        Phone
-        <input id="customerPhone" name="customerPhone" required />
-      </label>
+    <section class="panel">
+      <div class="panel-body">
+        <form id="jobForm" class="job-form">
+          <h2 class="panel-title">Customer details</h2>
 
-      <label>
-        Address
-        <input id="address" name="address" />
-      </label>
+          <div class="form-grid">
+            <label class="field">
+              <span class="field-label">Full name</span>
+              <input
+                id="customerName"
+                type="text"
+                autocomplete="name"
+                placeholder="Jane Electric"
+                required
+              />
+            </label>
 
-      <label>
-        Problem description
-        <textarea id="description" name="description"></textarea>
-      </label>
+            <label class="field">
+              <span class="field-label">Phone</span>
+              <input
+                id="customerPhone"
+                type="tel"
+                autocomplete="tel"
+                placeholder="555 123 4567"
+                required
+              />
+            </label>
+          </div>
 
-      <label>
-        Preferred date and time
-        <textarea id="date" name="date"></textarea>
-        <textarea id="time" name="time"></textarea>
-      </label>
+          <label class="field">
+            <span class="field-label">Service address</span>
+            <input
+              id="address"
+              type="text"
+              autocomplete="street-address"
+              placeholder="123 Main Street, Unit 2"
+            />
+          </label>
 
-      <label>
-        Priority
-        <select id="priority" name="priority">
-          <option value="normal">Normal</option>
-          <option value="high">High</option>
-          <option value="emergency">Emergency</option>
-        </select>
-      </label>
+          <label class="field">
+            <span class="field-label">Problem description</span>
+            <textarea
+              id="description"
+              rows="3"
+              placeholder="Describe what is happening, any noises, smells, or error codes."
+            ></textarea>
+          </label>
 
-      <button type="submit">Submit Job</button>
-    </form>
+          <h2 class="panel-title panel-title-spacing">Scheduling preference</h2>
 
-    <p id="jobFormStatus"></p>
+          <div class="form-grid">
+            <label class="field">
+              <span class="field-label">Preferred date</span>
+              <input id="date" type="date" />
+            </label>
+
+            <label class="field">
+              <span class="field-label">Preferred time</span>
+              <input id="time" type="time" />
+            </label>
+
+            <label class="field">
+              <span class="field-label">Priority</span>
+              <select id="priority">
+                <option value="normal" selected>Normal</option>
+                <option value="high">High</option>
+                <option value="emergency">Emergency</option>
+              </select>
+            </label>
+          </div>
+
+          <div class="form-footer">
+            <button type="submit" class="btn-primary">
+              Submit job
+            </button>
+            <p id="jobFormStatus" class="form-status"></p>
+          </div>
+        </form>
+      </div>
+    </section>
   </main>
 
   <script src="app.js"></script>
