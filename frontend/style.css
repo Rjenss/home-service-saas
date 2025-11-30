@@ -120,3 +120,225 @@ button:hover {
   font-size: 13px;
   color: #555;
 }
+
+/* Calendar layout */
+
+.calendar-layout {
+  max-width: 1100px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-rows: auto 1fr;
+  gap: 16px;
+}
+
+.calendar-controls {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  border: 1px solid #e2e8f0;
+}
+
+.calendar-controls-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.calendar-subtitle {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: #64748b;
+}
+
+.calendar-today-info {
+  text-align: right;
+  font-size: 13px;
+}
+
+.calendar-current-day {
+  font-weight: 600;
+  font-size: 14px;
+  margin-bottom: 2px;
+}
+
+.calendar-timezone {
+  color: #64748b;
+}
+
+/* Day selector row */
+
+.day-selector {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+
+.day-selector::-webkit-scrollbar {
+  height: 6px;
+}
+
+.day-selector::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.7);
+  border-radius: 999px;
+}
+
+.day-chip {
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 88px;
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: nowrap;
+  transition: background 0.1s ease, border-color 0.1s ease, box-shadow 0.1s ease;
+}
+
+.day-chip:hover {
+  background: #eef2ff;
+  border-color: #6366f1;
+  box-shadow: 0 0 0 1px rgba(99, 102, 241, 0.1);
+}
+
+.day-chip--selected {
+  background: #4f46e5;
+  border-color: #4338ca;
+  color: #f9fafb;
+  box-shadow: 0 4px 10px rgba(79, 70, 229, 0.35);
+}
+
+.day-chip--selected .day-chip-count {
+  color: #e0e7ff;
+}
+
+.day-chip-dow {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.day-chip-date {
+  font-size: 12px;
+}
+
+.day-chip-count {
+  font-size: 11px;
+  color: #64748b;
+}
+
+/* Calendar content */
+
+.calendar-content {
+  background: transparent;
+}
+
+.calendar-status {
+  margin-bottom: 8px;
+  font-size: 13px;
+  color: #64748b;
+}
+
+.calendar-jobs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.calendar-empty {
+  font-size: 14px;
+  color: #64748b;
+}
+
+/* Technician sections */
+
+.calendar-tech-section {
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 12px 16px 10px;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.06);
+  border: 1px solid #e2e8f0;
+}
+
+.calendar-tech-heading {
+  margin: 0 0 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.calendar-day-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Visit cards (reusing job-card styles if already defined) */
+
+.visit-card {
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+}
+
+.job-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 600;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+
+.job-card-body {
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.visit-job-id {
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.visit-notes {
+  font-size: 12px;
+  color: #64748b;
+}
+
+/* Status pill */
+
+.visit-status {
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  text-transform: capitalize;
+}
+
+.visit-status-scheduled {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.visit-status-in-progress {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.visit-status-completed {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.visit-status-cancelled {
+  background: #fee2e2;
+  color: #b91c1c;
+}

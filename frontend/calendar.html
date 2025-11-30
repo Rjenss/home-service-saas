@@ -8,16 +8,36 @@
 <body>
   <header class="site-header">
     <h1>Jobs Calendar</h1>
-    <p>Internal view of jobs by date.</p>
+    <p>Internal calendar of scheduled job visits.</p>
     <nav>
       <a href="index.html">Back to portal</a>
       <a href="public-job.html">Create job</a>
+      <a href="technicians.html">Manage technicians</a>
     </nav>
   </header>
 
-  <main>
-    <div id="calendarStatus"></div>
-    <div id="calendarJobs"></div>
+  <main class="calendar-layout">
+    <section class="calendar-controls">
+      <div class="calendar-controls-row">
+        <div>
+          <h2>Schedule</h2>
+          <p class="calendar-subtitle">
+            View technician job visits for the next 14 days.
+          </p>
+        </div>
+        <div class="calendar-today-info">
+          <div id="calendarCurrentDayLabel" class="calendar-current-day"></div>
+          <div class="calendar-timezone">Times shown in Central Time (CST/CDT)</div>
+        </div>
+      </div>
+
+      <div id="calendarDaySelector" class="day-selector"></div>
+    </section>
+
+    <section class="calendar-content">
+      <div id="calendarStatus" class="calendar-status"></div>
+      <div id="calendarJobs" class="calendar-jobs-list"></div>
+    </section>
   </main>
 
   <script src="calendar.js"></script>

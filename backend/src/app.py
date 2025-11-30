@@ -336,7 +336,7 @@ def create_job(event):
     """
     Create a job from minimal UI data.
 
-    Expected JSON body from frontend:
+    Expected JSON body from frontend (public-job.html via app.js):
     {
       "customerName": "...",
       "customerPhone": "...",
@@ -352,27 +352,30 @@ def create_job(event):
     except json.JSONDecodeError:
         return response(400, {"message": "Invalid JSON body"})
 
+    # These match the frontend payload in app.js
     customer_name = body.get("customerName") or body.get("full_name")
     customer_phone = body.get("customerPhone") or body.get("phone")
     description = body.get("description") or body.get("problem") or ""
     address = body.get("address")
     priority = body.get("priority", "normal")
-    date_str = body.get("date")    # keep as simple string for now
-    time_str = body.get("time")    # keep as simple string for now
+    date_str = body.get("date")    # keep simple string for now
+    time_str = body.get("time")    # keep simple string for now
 
     if not customer_name:
         return response(400, {"message": "customerName/full_name is required"})
     if not customer_phone:
         return response(400, {"message": "customerPhone/phone is required"})
 
-    # Find or create the customer by phone, passing address so we can store it
+    # RESTORE: customer behavior "exactly how it was"
+    # Use the helper that finds/creates by phone + org,
+    # and stores address_line1 if this is a new customer.
     customer = get_or_create_customer(customer_name, customer_phone, address)
     customer_id = customer["id"]
 
     now = now_utc_iso()
     job_id = str(uuid.uuid4())
 
-    # New: derive job status from presence of date and time
+    # New: derive job status based on date + time
     if date_str and time_str:
         job_status = "Scheduled"
     else:
@@ -386,7 +389,7 @@ def create_job(event):
         "customerPhone": customer_phone,
         "address": address,
         "description": description,
-        "status": job_status,
+        "status": job_status,          # <- now reflects scheduling state
         "priority": priority,
         "requested_date": date_str,
         "requested_time": time_str,
@@ -394,20 +397,22 @@ def create_job(event):
         "updated_at": now,
     }
 
+    # Write the job record
     jobs_table.put_item(Item=job_item)
 
-    # New: only create an initial Job Visit if the job is scheduled
-    visit_item = None
+    # New: only create a Job Visit when the job is actually scheduled
     if job_status == "Scheduled":
-        visit_item = create_initial_job_visit_for_job(
+        create_initial_job_visit_for_job(
             job_id=job_id,
             date_str=date_str,
             time_str=time_str,
             notes=description,
         )
+        # We don't need to return the visit yet; calendar is driven by GET /job_visits
 
-    # Return both job and visit so the UI has everything if needed
-    return response(201, {"job": job_item, "job_visit": visit_item})
+    # IMPORTANT: return the job object itself (flat), like before,
+    # so frontend code that reads createdJob.jobId still works.
+    return response(201, job_item)
 
 
 def list_job_visits():
