@@ -1,7 +1,6 @@
 // calendar.js
 const API_BASE_URL = "https://fdho6lafwk.execute-api.us-east-2.amazonaws.com/Prod";
 const TIMEZONE = "America/Chicago";
-const DAY_RANGE_DAYS = 14; // today + 13
 
 function getApiBaseUrl() {
   return API_BASE_URL.replace(/\/+$/, "");
@@ -10,8 +9,9 @@ function getApiBaseUrl() {
 document.addEventListener("DOMContentLoaded", () => {
   const statusEl = document.getElementById("calendarStatus");
   const calendarEl = document.getElementById("calendarJobs");
-  const daySelectorEl = document.getElementById("calendarDaySelector");
   const currentDayLabelEl = document.getElementById("calendarCurrentDayLabel");
+  const prevDayBtn = document.getElementById("prevDayBtn");
+  const nextDayBtn = document.getElementById("nextDayBtn");
 
   let allVisits = [];
   let selectedDate = getTodayDateCST(); // "YYYY-MM-DD"
@@ -20,7 +20,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function init() {
     updateCurrentDayLabel(selectedDate);
-    renderDaySelector();
+    if (prevDayBtn) {
+      prevDayBtn.addEventListener("click", () => changeDay(-1));
+    }
+    if (nextDayBtn) {
+      nextDayBtn.addEventListener("click", () => changeDay(1));
+    }
     loadJobVisitsForCalendar();
   }
 
@@ -38,6 +43,27 @@ document.addEventListener("DOMContentLoaded", () => {
     const month = parts.find(p => p.type === "month").value;
     const day = parts.find(p => p.type === "day").value;
     return `${year}-${month}-${day}`;
+  }
+
+  function isoToDate(iso) {
+    const [y, m, d] = iso.split("-").map(Number);
+    return new Date(Date.UTC(y, m - 1, d));
+  }
+
+  function dateToIsoUTC(date) {
+    const y = date.getUTCFullYear();
+    const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+    const d = String(date.getUTCDate()).padStart(2, "0");
+    return `${y}-${m}-${d}`;
+  }
+
+  // Move selected date by offset days (-1 = previous, 1 = next)
+  function changeDay(offset) {
+    const date = isoToDate(selectedDate);
+    date.setUTCDate(date.getUTCDate() + offset);
+    selectedDate = dateToIsoUTC(date);
+    updateCurrentDayLabel(selectedDate);
+    renderVisitsForSelectedDay();
   }
 
   // Friendly label for currently selected day
@@ -59,92 +85,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     currentDayLabelEl.textContent = formatter.format(date);
-  }
-
-  // Build the 14-day selector row
-  function renderDaySelector() {
-    if (!daySelectorEl) return;
-    daySelectorEl.innerHTML = "";
-
-    const todayIso = getTodayDateCST();
-    const todayDate = isoToDate(todayIso);
-
-    const visitCountsByDate = countVisitsByDate(allVisits);
-
-    for (let offset = 0; offset < DAY_RANGE_DAYS; offset++) {
-      const date = new Date(todayDate.getTime());
-      date.setDate(date.getDate() + offset);
-
-      const iso = dateToIso(date);
-      const label = formatDayChipLabel(date);
-      const count = visitCountsByDate[iso] || 0;
-
-      const btn = document.createElement("button");
-      btn.type = "button";
-      btn.className = "day-chip";
-      if (iso === selectedDate) {
-        btn.classList.add("day-chip--selected");
-      }
-
-      btn.dataset.date = iso;
-
-      btn.innerHTML = `
-        <span class="day-chip-dow">${label.dow}</span>
-        <span class="day-chip-date">${label.date}</span>
-        <span class="day-chip-count">${count ? count + " visits" : "No visits"}</span>
-      `;
-
-      btn.addEventListener("click", () => {
-        selectedDate = iso;
-        updateCurrentDayLabel(selectedDate);
-        renderDaySelector(); // re-render to update selection and counts
-        renderVisitsForSelectedDay();
-      });
-
-      daySelectorEl.appendChild(btn);
-    }
-  }
-
-  function isoToDate(iso) {
-    const [y, m, d] = iso.split("-").map(Number);
-    return new Date(Date.UTC(y, m - 1, d));
-  }
-
-  function dateToIso(date) {
-    const formatter = new Intl.DateTimeFormat("en-CA", {
-      timeZone: TIMEZONE,
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-    });
-    return formatter.format(date);
-  }
-
-  function formatDayChipLabel(date) {
-    const dowFmt = new Intl.DateTimeFormat("en-US", {
-      timeZone: TIMEZONE,
-      weekday: "short",
-    });
-    const dateFmt = new Intl.DateTimeFormat("en-US", {
-      timeZone: TIMEZONE,
-      month: "numeric",
-      day: "numeric",
-    });
-
-    return {
-      dow: dowFmt.format(date),   // Mon
-      date: dateFmt.format(date), // 11/29
-    };
-  }
-
-  function countVisitsByDate(visits) {
-    const counts = {};
-    for (const v of visits) {
-      const dateKey = v.scheduled_date;
-      if (!dateKey) continue;
-      counts[dateKey] = (counts[dateKey] || 0) + 1;
-    }
-    return counts;
   }
 
   async function loadJobVisitsForCalendar() {
@@ -181,9 +121,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       }
 
-      // After we have data, re-render day selector with counts,
-      // then render visits for the currently selected day.
-      renderDaySelector();
       renderVisitsForSelectedDay();
     } catch (err) {
       console.error("Error loading job visits:", err);
@@ -208,7 +145,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const visits = allVisits
       .filter(v => v.scheduled_date === selectedDate)
       .sort((a, b) => {
-        const ta = (a.scheduled_time || "").padStart(5, "9"); // crude but good enough
+        const ta = (a.scheduled_time || "").padStart(5, "9");
         const tb = (b.scheduled_time || "").padStart(5, "9");
         if (ta < tb) return -1;
         if (ta > tb) return 1;
@@ -226,14 +163,14 @@ document.addEventListener("DOMContentLoaded", () => {
     // Group by technician so dispatcher can see who is doing what
     const byTech = {};
     for (const visit of visits) {
-      const techKey =
+      const techLabel =
         visit.technician_name ||
         visit.technician_id ||
         "Unassigned";
-      if (!byTech[techKey]) {
-        byTech[techKey] = [];
+      if (!byTech[techLabel]) {
+        byTech[techLabel] = [];
       }
-      byTech[techKey].push(visit);
+      byTech[techLabel].push(visit);
     }
 
     for (const techLabel of Object.keys(byTech)) {

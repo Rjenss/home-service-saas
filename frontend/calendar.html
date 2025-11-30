@@ -22,16 +22,39 @@
         <div>
           <h2>Schedule</h2>
           <p class="calendar-subtitle">
-            View technician job visits for the next 14 days.
+            View technician job visits one day at a time.
           </p>
         </div>
         <div class="calendar-today-info">
-          <div id="calendarCurrentDayLabel" class="calendar-current-day"></div>
-          <div class="calendar-timezone">Times shown in Central Time (CST/CDT)</div>
+          <div class="calendar-day-nav">
+            <button
+              id="prevDayBtn"
+              class="day-nav-button"
+              type="button"
+              aria-label="Previous day"
+            >
+              &#8592;
+            </button>
+
+            <div
+              id="calendarCurrentDayLabel"
+              class="calendar-current-day"
+            ></div>
+
+            <button
+              id="nextDayBtn"
+              class="day-nav-button"
+              type="button"
+              aria-label="Next day"
+            >
+              &#8594;
+            </button>
+          </div>
+          <div class="calendar-timezone">
+            Times shown in Central Time (CST/CDT)
+          </div>
         </div>
       </div>
-
-      <div id="calendarDaySelector" class="day-selector"></div>
     </section>
 
     <section class="calendar-content">

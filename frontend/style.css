@@ -342,3 +342,48 @@ button:hover {
   background: #fee2e2;
   color: #b91c1c;
 }
+
+.calendar-controls-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+
+.calendar-today-info {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+}
+
+.calendar-day-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.day-nav-button {
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #f8fafc;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+
+.day-nav-button:hover {
+  background: #eef2ff;
+  border-color: #6366f1;
+}
+
+.calendar-current-day {
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.calendar-timezone {
+  font-size: 12px;
+  color: #64748b;
+}
