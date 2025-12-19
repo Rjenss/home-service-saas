@@ -12,7 +12,7 @@ logger.setLevel(logging.INFO)
 
 dynamodb = boto3.resource("dynamodb")
 
-# One org per deployment / stack
+# One org per deployment or stack
 ORGANIZATION_ID = os.environ.get("ORGANIZATION_ID", "org_pilot")
 
 jobs_table = dynamodb.Table(os.environ["JOBS_TABLE"])
@@ -24,66 +24,78 @@ job_visits_table = dynamodb.Table(os.environ["JOB_VISITS_TABLE"])
 def lambda_handler(event, context):
     """
     API entry point for:
-      - GET  /              (root)
-      - GET  /hello         (health check)
-      - GET  /jobs
-      - POST /jobs
-      - GET  /customers
-      - POST /customers
-      - GET  /technicians
-      - POST /technicians
-      - GET  /job_visits
-      - POST /job_visits
+      GET  /
+      GET  /hello
+
+      GET  /jobs
+      POST /jobs
+
+      GET  /customers
+      POST /customers
+
+      GET  /technicians
+      POST /technicians
+
+      GET  /job_visits
+      POST /job_visits
+
+    Notes:
+      - Multi tenant foundation via organization_id
+      - CORS enabled for browser calls
     """
     logger.info("Event: %s", json.dumps(event))
 
     path = event.get("path", "")
     method = event.get("httpMethod", "")
 
-    # Root endpoint - simple landing / status
+    # CORS preflight
+    if method == "OPTIONS":
+        return response(200, "", extra_headers={})
+
+    # Root endpoint
     if path in ("", "/") and method == "GET":
-        return response(200, {
-            "message": "Field Service API - root",
-            "endpoints": [
-                "/hello",
-                "/jobs",
-                "/customers",
-                "/technicians",
-                "/job_visits",
-            ],
-        })
+        return response(
+            200,
+            {
+                "message": "Field Service API",
+                "organization_id": ORGANIZATION_ID,
+                "endpoints": [
+                    "/hello",
+                    "/jobs",
+                    "/customers",
+                    "/technicians",
+                    "/job_visits",
+                ],
+            },
+        )
 
-    # Simple health/check endpoint
+    # Health check
     if path == "/hello" and method == "GET":
-        return response(200, "Ryan's Lambda")
+        return response(200, {"message": "ok"})
 
-    # Customer endpoints
+    # Customers
     if path == "/customers" and method == "POST":
         return create_customer(event)
     if path == "/customers" and method == "GET":
         return list_customers()
 
-    # Job endpoints
+    # Jobs
     if path == "/jobs" and method == "POST":
         return create_job(event)
     if path == "/jobs" and method == "GET":
         return list_jobs()
 
-    # Technician endpoints (internal admin UI)
+    # Technicians
     if path == "/technicians" and method == "POST":
         return create_technician(event)
     if path == "/technicians" and method == "GET":
         return list_technicians()
 
-    # Job visit endpoints (calendar will use these)
+    # Job visits
     if path == "/job_visits" and method == "POST":
         return create_job_visit(event)
     if path == "/job_visits" and method == "GET":
         return list_job_visits()
-
-    # OPTIONS for CORS preflight
-    if method == "OPTIONS":
-        return response(200, "", extra_headers={})
 
     return response(404, {"message": "Not found"})
 
@@ -95,32 +107,61 @@ def now_utc_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+# ---------- GENERAL HELPERS ----------
+
+
+def safe_json_body(event):
+    try:
+        return json.loads(event.get("body") or "{}")
+    except json.JSONDecodeError:
+        return None
+
+
+def parse_bool(value, default=False):
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        v = value.strip().lower()
+        if v in ("true", "1", "yes", "y"):
+            return True
+        if v in ("false", "0", "no", "n"):
+            return False
+    return default
+
+
+def normalize_phone(phone: str) -> str:
+    if phone is None:
+        return ""
+    phone = phone.strip()
+    digits = "".join([c for c in phone if c.isdigit()])
+    return digits or phone
+
+
 # ---------- CUSTOMERS ----------
 
 
 def create_customer(event):
     """
-    Create a new customer record from inbound web/call data.
+    Create a new customer record.
 
-    Expected JSON body (all optional except full_name + phone):
+    Expected JSON body:
     {
       "full_name": "...",
       "phone": "...",
       "email": "...",
       "address_line1": "...",
       "address_line2": "...",
-      "is_business": true/false,
+      "is_business": true or false,
       "company_name": "...",
       "notes": "..."
     }
     """
-    try:
-        body = json.loads(event.get("body") or "{}")
-    except json.JSONDecodeError:
+    body = safe_json_body(event)
+    if body is None:
         return response(400, {"message": "Invalid JSON body"})
 
-    full_name = body.get("full_name")
-    phone = (body.get("phone") or "").strip()
+    full_name = (body.get("full_name") or "").strip()
+    phone = normalize_phone(body.get("phone") or "")
 
     if not full_name:
         return response(400, {"message": "full_name is required"})
@@ -130,14 +171,6 @@ def create_customer(event):
     now = now_utc_iso()
     customer_id = str(uuid.uuid4())
 
-    is_business_raw = body.get("is_business")
-    if isinstance(is_business_raw, bool):
-        is_business = is_business_raw
-    elif isinstance(is_business_raw, str):
-        is_business = is_business_raw.lower() in ("true", "1", "yes", "y")
-    else:
-        is_business = False
-
     item = {
         "id": customer_id,
         "organization_id": ORGANIZATION_ID,
@@ -146,7 +179,7 @@ def create_customer(event):
         "email": body.get("email"),
         "address_line1": body.get("address_line1"),
         "address_line2": body.get("address_line2"),
-        "is_business": is_business,
+        "is_business": parse_bool(body.get("is_business"), default=False),
         "company_name": body.get("company_name"),
         "notes": body.get("notes") or "",
         "created_at": now,
@@ -154,7 +187,6 @@ def create_customer(event):
     }
 
     customers_table.put_item(Item=item)
-
     return response(201, item)
 
 
@@ -162,27 +194,24 @@ def list_customers():
     resp = customers_table.scan(
         FilterExpression=Attr("organization_id").eq(ORGANIZATION_ID)
     )
-    items = resp.get("Items", [])
-    return response(200, items)
+    return response(200, resp.get("Items", []))
 
 
 def get_or_create_customer(full_name: str, phone: str, address: str | None = None):
     """
-    Look up a customer by phone + organization.
-    If found, return that customer.
-    If not, create a new minimal customer record.
+    Look up a customer by normalized phone and organization.
+    If found, return it.
+    If not, create a new minimal customer.
 
-    If address is provided and this is a new customer, store it
-    in address_line1.
+    If address is provided and this is a new customer, store it in address_line1.
     """
-    phone_norm = (phone or "").strip()
+    phone_norm = normalize_phone(phone)
 
     resp = customers_table.scan(
         FilterExpression=Attr("organization_id").eq(ORGANIZATION_ID)
         & Attr("phone").eq(phone_norm)
     )
     items = resp.get("Items", [])
-
     if items:
         return items[0]
 
@@ -192,7 +221,7 @@ def get_or_create_customer(full_name: str, phone: str, address: str | None = Non
     customer = {
         "id": customer_id,
         "organization_id": ORGANIZATION_ID,
-        "full_name": full_name,
+        "full_name": (full_name or "").strip(),
         "phone": phone_norm,
         "email": None,
         "address_line1": address,
@@ -213,43 +242,56 @@ def get_or_create_customer(full_name: str, phone: str, address: str | None = Non
 
 def create_job(event):
     """
-    Create a job from minimal UI data.
+    Create a job from UI data.
 
-    Expected JSON body from frontend:
+    Expected JSON body:
     {
       "customerName": "...",
       "customerPhone": "...",
-      "address": "...",          # optional
+      "address": "...",
       "description": "...",
       "priority": "normal",
-      "date": "2025-11-24",      # requested date (string)
-      "time": "14:30"            # requested time (string, 24h)
+      "date": "YYYY-MM-DD",
+      "time": "HH:MM",
+      "status": "Scheduled"  (optional override)
     }
+
+    Status derivation:
+      - If status is provided, we use it
+      - If status is missing, status becomes Scheduled when date and time are present, else Unscheduled
+
+    Job visit creation:
+      - If final status is Scheduled and date and time exist, create an initial Job Visit record
     """
-    try:
-        body = json.loads(event.get("body") or "{}")
-    except json.JSONDecodeError:
+    body = safe_json_body(event)
+    if body is None:
         return response(400, {"message": "Invalid JSON body"})
 
-    customer_name = body.get("customerName") or body.get("full_name")
-    customer_phone = body.get("customerPhone") or body.get("phone")
+    customer_name = (body.get("customerName") or body.get("full_name") or "").strip()
+    customer_phone = normalize_phone(body.get("customerPhone") or body.get("phone") or "")
     description = body.get("description") or body.get("problem") or ""
     address = body.get("address")
     priority = body.get("priority", "normal")
-    date_str = body.get("date")   # keep as simple string for now
-    time_str = body.get("time")   # keep as simple string for now
+
+    date_str = body.get("date")
+    time_str = body.get("time")
 
     if not customer_name:
-        return response(400, {"message": "customerName/full_name is required"})
+        return response(400, {"message": "customerName is required"})
     if not customer_phone:
-        return response(400, {"message": "customerPhone/phone is required"})
+        return response(400, {"message": "customerPhone is required"})
 
-    # Find or create the customer by phone, passing address so we can store it
     customer = get_or_create_customer(customer_name, customer_phone, address)
     customer_id = customer["id"]
 
     now = now_utc_iso()
     job_id = str(uuid.uuid4())
+
+    incoming_status = body.get("status")
+    if isinstance(incoming_status, str) and incoming_status.strip():
+        job_status = incoming_status.strip()
+    else:
+        job_status = "Scheduled" if (date_str and time_str) else "Unscheduled"
 
     job_item = {
         "jobId": job_id,
@@ -259,7 +301,7 @@ def create_job(event):
         "customerPhone": customer_phone,
         "address": address,
         "description": description,
-        "status": "new",
+        "status": job_status,
         "priority": priority,
         "requested_date": date_str,
         "requested_time": time_str,
@@ -269,24 +311,23 @@ def create_job(event):
 
     jobs_table.put_item(Item=job_item)
 
-    # Also create an initial Job Visit (no technician assigned yet)
-    visit_item = create_initial_job_visit_for_job(
-        job_id=job_id,
-        date_str=date_str,
-        time_str=time_str,
-        notes=description,
-    )
+    if job_status == "Scheduled" and date_str and time_str:
+        create_initial_job_visit_for_job(
+            job_id=job_id,
+            date_str=date_str,
+            time_str=time_str,
+            notes=description,
+        )
 
-    # Return both job and visit so the UI has everything if needed
-    return response(201, {"job": job_item, "job_visit": visit_item})
+    # Return flat job item so frontend can read createdJob.jobId
+    return response(201, job_item)
 
 
 def list_jobs():
     resp = jobs_table.scan(
         FilterExpression=Attr("organization_id").eq(ORGANIZATION_ID)
     )
-    items = resp.get("Items", [])
-    return response(200, items)
+    return response(200, resp.get("Items", []))
 
 
 # ---------- JOB VISITS ----------
@@ -299,14 +340,12 @@ def create_initial_job_visit_for_job(
     notes: str | None = "",
 ):
     """
-    Helper to create a single initial visit when the job is created.
-    For now, technician_id is None (unassigned), and we just store
-    date/time as provided plus a simple combined string.
+    Create a single initial visit when the job is created.
+    technician_id is None initially.
     """
     now = now_utc_iso()
     visit_id = str(uuid.uuid4())
 
-    # Simple combined string for display; you can improve later
     if date_str and time_str:
         scheduled_display = f"{date_str} {time_str}"
     elif date_str:
@@ -318,10 +357,12 @@ def create_initial_job_visit_for_job(
         "id": visit_id,
         "organization_id": ORGANIZATION_ID,
         "job_id": job_id,
-        "technician_id": None,          # assign later from calendar
+        "technician_id": None,
         "scheduled_date": date_str,
         "scheduled_time": time_str,
         "scheduled_display": scheduled_display,
+        "actual_start": None,
+        "actual_end": None,
         "status": "scheduled",
         "notes": notes or "",
         "created_at": now,
@@ -332,95 +373,74 @@ def create_initial_job_visit_for_job(
     return item
 
 
-def create_job(event):
+def create_job_visit(event):
     """
-    Create a job from minimal UI data.
+    Create a job visit record directly.
 
-    Expected JSON body from frontend (public-job.html via app.js):
+    Expected JSON body:
     {
-      "customerName": "...",
-      "customerPhone": "...",
-      "address": "...",          # optional
-      "description": "...",
-      "priority": "normal",
-      "date": "2025-11-24",      # requested date (string)
-      "time": "14:30"            # requested time (string, 24h)
+      "job_id": "...",
+      "technician_id": "...",          optional
+      "scheduled_date": "YYYY-MM-DD",  optional
+      "scheduled_time": "HH:MM",       optional
+      "scheduled_start": "...",        optional
+      "scheduled_end": "...",          optional
+      "status": "scheduled",
+      "notes": "..."
     }
+
+    Note:
+      - Your current calendar uses scheduled_date and scheduled_time
+      - scheduled_start and scheduled_end are accepted for future upgrade
     """
-    try:
-        body = json.loads(event.get("body") or "{}")
-    except json.JSONDecodeError:
+    body = safe_json_body(event)
+    if body is None:
         return response(400, {"message": "Invalid JSON body"})
 
-    # These match the frontend payload in app.js
-    customer_name = body.get("customerName") or body.get("full_name")
-    customer_phone = body.get("customerPhone") or body.get("phone")
-    description = body.get("description") or body.get("problem") or ""
-    address = body.get("address")
-    priority = body.get("priority", "normal")
-    date_str = body.get("date")    # keep simple string for now
-    time_str = body.get("time")    # keep simple string for now
-
-    if not customer_name:
-        return response(400, {"message": "customerName/full_name is required"})
-    if not customer_phone:
-        return response(400, {"message": "customerPhone/phone is required"})
-
-    # RESTORE: customer behavior "exactly how it was"
-    # Use the helper that finds/creates by phone + org,
-    # and stores address_line1 if this is a new customer.
-    customer = get_or_create_customer(customer_name, customer_phone, address)
-    customer_id = customer["id"]
+    job_id = body.get("job_id") or body.get("jobId")
+    if not job_id:
+        return response(400, {"message": "job_id is required"})
 
     now = now_utc_iso()
-    job_id = str(uuid.uuid4())
+    visit_id = str(uuid.uuid4())
 
-    # New: derive job status based on date + time
-    if date_str and time_str:
-        job_status = "Scheduled"
+    scheduled_date = body.get("scheduled_date") or body.get("date")
+    scheduled_time = body.get("scheduled_time") or body.get("time")
+
+    if scheduled_date and scheduled_time:
+        scheduled_display = f"{scheduled_date} {scheduled_time}"
+    elif scheduled_date:
+        scheduled_display = scheduled_date
     else:
-        job_status = "Unscheduled"
+        scheduled_display = None
 
-    job_item = {
-        "jobId": job_id,
+    item = {
+        "id": visit_id,
         "organization_id": ORGANIZATION_ID,
-        "customer_id": customer_id,
-        "customerName": customer_name,
-        "customerPhone": customer_phone,
-        "address": address,
-        "description": description,
-        "status": job_status,          # <- now reflects scheduling state
-        "priority": priority,
-        "requested_date": date_str,
-        "requested_time": time_str,
+        "job_id": job_id,
+        "technician_id": body.get("technician_id"),
+        "scheduled_date": scheduled_date,
+        "scheduled_time": scheduled_time,
+        "scheduled_display": scheduled_display,
+        "scheduled_start": body.get("scheduled_start"),
+        "scheduled_end": body.get("scheduled_end"),
+        "actual_start": body.get("actual_start"),
+        "actual_end": body.get("actual_end"),
+        "status": body.get("status") or "scheduled",
+        "notes": body.get("notes") or "",
         "created_at": now,
         "updated_at": now,
     }
 
-    # Write the job record
-    jobs_table.put_item(Item=job_item)
-
-    # New: only create a Job Visit when the job is actually scheduled
-    if job_status == "Scheduled":
-        create_initial_job_visit_for_job(
-            job_id=job_id,
-            date_str=date_str,
-            time_str=time_str,
-            notes=description,
-        )
-        # We don't need to return the visit yet; calendar is driven by GET /job_visits
-
-    # IMPORTANT: return the job object itself (flat), like before,
-    # so frontend code that reads createdJob.jobId still works.
-    return response(201, job_item)
+    job_visits_table.put_item(Item=item)
+    return response(201, item)
 
 
 def list_job_visits():
     resp = job_visits_table.scan(
         FilterExpression=Attr("organization_id").eq(ORGANIZATION_ID)
     )
-    items = resp.get("Items", [])
-    return response(200, items)
+    return response(200, resp.get("Items", []))
 
 
 # ---------- TECHNICIANS ----------
@@ -430,23 +450,23 @@ def create_technician(event):
     """
     Create a technician record.
 
-    Expected JSON:
+    Expected JSON body:
     {
       "first_name": "...",
       "last_name": "...",
       "phone": "...",
       "email": "...",
-      "skill_tags": "PANEL_UPGRADE,EV_CHARGER"
+      "skill_tags": "PANEL_UPGRADE,EV_CHARGER",
+      "active": true or false
     }
     """
-    try:
-        body = json.loads(event.get("body") or "{}")
-    except json.JSONDecodeError:
+    body = safe_json_body(event)
+    if body is None:
         return response(400, {"message": "Invalid JSON body"})
 
     first_name = (body.get("first_name") or "").strip()
     last_name = (body.get("last_name") or "").strip()
-    phone = (body.get("phone") or "").strip()
+    phone = normalize_phone(body.get("phone") or "")
 
     if not first_name:
         return response(400, {"message": "first_name is required"})
@@ -464,7 +484,7 @@ def create_technician(event):
         "phone": phone,
         "email": body.get("email"),
         "skill_tags": body.get("skill_tags"),
-        "active": True,
+        "active": parse_bool(body.get("active"), default=True),
         "created_at": now,
         "updated_at": now,
     }
@@ -477,8 +497,7 @@ def list_technicians():
     resp = technicians_table.scan(
         FilterExpression=Attr("organization_id").eq(ORGANIZATION_ID)
     )
-    items = resp.get("Items", [])
-    return response(200, items)
+    return response(200, resp.get("Items", []))
 
 
 # ---------- RESPONSE HELPER ----------

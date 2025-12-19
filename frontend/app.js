@@ -18,10 +18,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const job = {
       customerName: document.getElementById("customerName").value.trim(),
       customerPhone: document.getElementById("customerPhone").value.trim(),
-      address: document.getElementById("address").value.trim(),
+      address: document.getElementById("address").value.trim() || null,
       description: document.getElementById("description").value.trim(),
-      date: document.getElementById("date").value.trim(),
-      time: document.getElementById("time").value.trim(),
+      date: document.getElementById("date").value.trim() || null,
+      time: document.getElementById("time").value.trim() || null,
       priority: document.getElementById("priority").value,
     };
 
