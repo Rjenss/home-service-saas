@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Unscheduled jobs</title>
+  <link rel="stylesheet" href="styles.css?v=2" />
+</head>
+<body class="page">
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">T</span>
+        <div class="brand-text">
+          <span class="brand-name">Technisend</span>
+          <span class="brand-subtitle">Field service control center</span>
+        </div>
+      </a>
+      <nav class="site-nav">
+        <a href="index.html">Portal</a>
+        <a href="public-job.html">Create job</a>
+        <a href="calendar.html">Calendar</a>
+        <a href="technicians.html">Technicians</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="panel panel-hero">
+      <div class="panel-body hero-body">
+        <div>
+          <h1 class="hero-title">Unscheduled jobs</h1>
+          <p class="hero-subtitle">
+            Review work requests that have not been assigned a date and time. These are jobs with status set to Unscheduled.
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-body">
+        <div class="calendar-header-row">
+          <div class="calendar-timezone">Unscheduled queue</div>
+          <div id="unscheduledStatus" class="calendar-status"></div>
+        </div>
+
+        <div id="unscheduledJobs" class="calendar-jobs-list"></div>
+      </div>
+    </section>
+  </main>
+
+  <script src="unscheduled.js"></script>
+</body>
+</html>
