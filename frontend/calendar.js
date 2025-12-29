@@ -14,7 +14,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const nextDayBtn = document.getElementById("nextDayBtn");
 
   let allVisits = [];
-  let selectedDate = getTodayIso(); // "YYYY-MM-DD" in your local time (CST/CDT for you)
+  let selectedDate = getTodayIso(); // "YYYY-MM-DD" (CST)
 
   init();
 

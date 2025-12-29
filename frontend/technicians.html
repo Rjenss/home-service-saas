@@ -2,61 +2,98 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Technicians - Field Service Portal</title>
+  <title>Technicians</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
-<body>
-  <header>
-    <h1>Technicians</h1>
-    <nav>
-      <a href="index.html">Portal Home</a>
-      <a href="internal-job.html">Create Job</a>
-      <a href="calendar.html">Calendar</a>
-    </nav>
+<body class="page">
+  <header class="site-header">
+    <div class="site-header-inner">
+      <div class="brand">
+        <span class="brand-mark">T</span>
+        <div class="brand-text">
+          <span class="brand-name">Technisend</span>
+          <span class="brand-subtitle">Technicians</span>
+        </div>
+      </div>
+      <nav class="site-nav">
+        <a href="index.html">Portal</a>
+        <a href="public-job.html">Create job</a>
+        <a href="calendar.html">Calendar</a>
+      </nav>
+    </div>
   </header>
 
-  <main>
-    <section class="card">
-      <h2>Add Technician</h2>
-      <form id="techForm">
-        <label>
-          First Name
-          <input type="text" id="firstName" required />
-        </label>
-
-        <label>
-          Last Name
-          <input type="text" id="lastName" />
-        </label>
-
-        <label>
-          Phone
-          <input type="text" id="phone" required />
-        </label>
-
-        <label>
-          Email
-          <input type="email" id="email" />
-        </label>
-
-        <label>
-          Skills (comma-separated)
-          <input type="text" id="skillTags" placeholder="PANEL_UPGRADE,EV_CHARGER" />
-        </label>
-
-        <button type="submit">Save Technician</button>
-      </form>
-      <div id="techFormStatus" class="status"></div>
+  <main class="shell">
+    <section class="panel panel-hero">
+      <div class="panel-body hero-body">
+        <div>
+          <h1 class="hero-title">Technicians</h1>
+          <p class="hero-subtitle">
+            Add technicians and view the current roster.
+          </p>
+        </div>
+      </div>
     </section>
 
-    <section class="card">
-      <h2>Existing Technicians</h2>
-      <div id="techList">Loading technicians...</div>
+    <section class="panel">
+      <div class="panel-body">
+        <h2 class="panel-title">Add technician</h2>
+
+        <form id="techForm" class="job-form">
+          <div class="form-grid">
+            <div class="field">
+              <label class="field-label" for="firstName">First name</label>
+              <input type="text" id="firstName" required />
+            </div>
+
+            <div class="field">
+              <label class="field-label" for="lastName">Last name</label>
+              <input type="text" id="lastName" />
+            </div>
+
+            <div class="field">
+              <label class="field-label" for="phone">Phone</label>
+              <input type="text" id="phone" required />
+            </div>
+
+            <div class="field">
+              <label class="field-label" for="email">Email</label>
+              <input type="email" id="email" />
+            </div>
+
+            <div class="field">
+              <label class="field-label" for="skillTags">Skills (comma-separated)</label>
+              <input
+                type="text"
+                id="skillTags"
+                placeholder="PANEL_UPGRADE,EV_CHARGER"
+              />
+            </div>
+          </div>
+
+          <div class="form-footer">
+            <button class="btn-primary" type="submit">Save technician</button>
+            <div id="techFormStatus" class="form-status"></div>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-body">
+        <div class="calendar-header-row">
+          <div class="calendar-timezone">
+            Active technicians
+          </div>
+          <div id="techListStatus" class="calendar-status"></div>
+        </div>
+
+        <div id="techList" class="calendar-jobs-list"></div>
+      </div>
     </section>
   </main>
 
   <script>
-    // Keep this in sync with your app.js API base URL
     const API_BASE_URL = "https://fdho6lafwk.execute-api.us-east-2.amazonaws.com/Prod";
 
     function getApiBaseUrl() {
@@ -66,6 +103,7 @@
     document.addEventListener("DOMContentLoaded", () => {
       const techForm = document.getElementById("techForm");
       const techFormStatus = document.getElementById("techFormStatus");
+      const techListStatus = document.getElementById("techListStatus");
       const techListEl = document.getElementById("techList");
 
       loadTechnicians();
@@ -122,27 +160,30 @@
       async function loadTechnicians() {
         const baseUrl = getApiBaseUrl();
         if (!baseUrl) {
-          techListEl.textContent = "API base URL is not set.";
+          techListStatus.textContent = "API base URL is not set.";
+          techListEl.textContent = "";
           return;
         }
 
-        techListEl.textContent = "Loading technicians...";
+        techListStatus.textContent = "Loading...";
+        techListEl.textContent = "";
 
         try {
-          const res = await fetch(`${baseUrl}/technicians`, {
-            method: "GET",
-          });
+          const res = await fetch(`${baseUrl}/technicians`, { method: "GET" });
 
           const text = await res.text();
           if (!res.ok) {
-            techListEl.textContent = `Error: ${res.status} ${text}`;
+            techListStatus.textContent = `Error: ${res.status}`;
+            techListEl.textContent = text;
             return;
           }
 
           const technicians = JSON.parse(text);
           renderTechnicians(technicians);
+          techListStatus.textContent = "";
         } catch (err) {
-          techListEl.textContent = `Error loading technicians: ${String(err)}`;
+          techListStatus.textContent = "Error loading technicians.";
+          techListEl.textContent = String(err);
         }
       }
 
@@ -150,21 +191,45 @@
         techListEl.innerHTML = "";
 
         if (!techs || techs.length === 0) {
-          techListEl.textContent = "No technicians yet.";
+          const empty = document.createElement("div");
+          empty.className = "calendar-empty";
+          empty.textContent = "No technicians yet.";
+          techListEl.appendChild(empty);
           return;
         }
 
         for (const tech of techs) {
           const div = document.createElement("div");
-          div.className = "tech-card";
+          div.className = "job-card visit-card";
+
+          const name = `${tech.first_name || ""} ${tech.last_name || ""}`.trim();
+          const phone = tech.phone || "";
+          const email = tech.email || "";
+          const skills = tech.skill_tags || "";
+
           div.innerHTML = `
-            <strong>${tech.first_name || ""} ${tech.last_name || ""}</strong><br/>
-            Phone: ${tech.phone || ""}<br/>
-            Email: ${tech.email || ""}<br/>
-            Skills: ${tech.skill_tags || ""}
+            <div class="job-card-header">
+              <div>${escapeHtml(name || "Technician")}</div>
+              <div class="visit-status visit-status-scheduled">active</div>
+            </div>
+            <div class="job-card-body">
+              <div class="visit-job-id">Phone: ${escapeHtml(phone)}</div>
+              <div>Email: ${escapeHtml(email)}</div>
+              <div class="visit-notes">Skills: ${escapeHtml(skills)}</div>
+            </div>
           `;
+
           techListEl.appendChild(div);
         }
+      }
+
+      function escapeHtml(value) {
+        return String(value || "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
       }
     });
   </script>

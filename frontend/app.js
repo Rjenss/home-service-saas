@@ -1,4 +1,4 @@
-// Set this to your API base URL from CloudFormation (ApiUrl)
+// API base URL from CloudFormation (ApiUrl)
 const API_BASE_URL = "https://fdho6lafwk.execute-api.us-east-2.amazonaws.com/Prod";
 
 function getApiBaseUrl() {
