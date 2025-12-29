@@ -102,6 +102,18 @@ body.page {
   color: var(--text-soft);
 }
 
+.brand {
+  text-decoration: none;
+  color: inherit;
+}
+
+.brand:hover,
+.brand:focus,
+.brand:active {
+  text-decoration: none;
+  color: inherit;
+}
+
 .site-nav {
   display: flex;
   align-items: center;
