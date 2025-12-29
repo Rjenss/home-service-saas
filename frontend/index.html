@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Technisend Portal</title>
+  <title>Portal</title>
   <link rel="stylesheet" href="styles.css?v=2" />
 </head>
 <body class="page">
@@ -15,6 +15,11 @@
           <span class="brand-subtitle">Field service control center</span>
         </div>
       </a>
+      <nav class="site-nav">
+        <a href="public-job.html">Create job</a>
+        <a href="calendar.html">Calendar</a>
+        <a href="technicians.html">Technicians</a>
+      </nav>
     </div>
   </header>
 
@@ -24,7 +29,7 @@
         <div>
           <h1 class="hero-title">Portal</h1>
           <p class="hero-subtitle">
-            Choose a workspace to create jobs, manage the schedule, and keep technicians on track.
+            Manage jobs, scheduling, and technician assignments.
           </p>
         </div>
       </div>
@@ -33,32 +38,27 @@
     <section class="panel">
       <div class="panel-body">
         <div class="portal-grid">
-          <a class="portal-card" href="public-job.html">
-            <div class="portal-card-icon">📋</div>
-            <h2>Customer job creation</h2>
-            <p>
-              Guided intake form for customers or office staff to submit new work requests.
-            </p>
-            <span class="portal-card-cta">Open form →</span>
+
+          <a href="public-job.html" class="portal-card">
+            <h3>Create job</h3>
+            <p>Submit a new service request.</p>
           </a>
 
-          <a class="portal-card" href="calendar.html">
-            <div class="portal-card-icon">📅</div>
-            <h2>Jobs calendar</h2>
-            <p>
-              Day view of scheduled job visits by technician. Navigate with simple arrows.
-            </p>
-            <span class="portal-card-cta">View schedule →</span>
+          <a href="calendar.html" class="portal-card">
+            <h3>Calendar</h3>
+            <p>View and manage scheduled jobs.</p>
           </a>
 
-          <a class="portal-card" href="technicians.html">
-            <div class="portal-card-icon">👷</div>
-            <h2>Technician roster</h2>
-            <p>
-              Manage the internal list of technicians and their contact details.
-            </p>
-            <span class="portal-card-cta">Manage technicians →</span>
+          <a href="technicians.html" class="portal-card">
+            <h3>Technicians</h3>
+            <p>View technicians and assignments.</p>
           </a>
+
+          <a href="unscheduled.html" class="portal-card">
+            <h3>Unscheduled jobs</h3>
+            <p>Review jobs awaiting scheduling.</p>
+          </a>
+
         </div>
       </div>
     </section>
