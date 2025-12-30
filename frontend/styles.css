@@ -522,8 +522,8 @@ body > header nav a {
 
 .shell-with-sidebar {
   display: grid;
-  grid-template-columns: 240px minmax(0, 1120px);
-  gap: 24px;
+  grid-template-columns: 170px minmax(0, 1120px);
+  gap: 22px;
   align-items: start;
 }
 
@@ -531,13 +531,14 @@ body > header nav a {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: var(--radius-lg);
-  padding: 20px;
 
+  padding: 14px 10px;
   min-height: calc(100vh - 96px);
   display: flex;
   flex-direction: column;
 
-  margin-left: -260px;
+  /* Pull it into the left highlight area, but only by a small amount */
+  margin-left: -140px;
 }
 
 .sidebar-nav {
@@ -548,10 +549,15 @@ body > header nav a {
 
 .sidebar-link {
   display: block;
-  padding: 10px 12px;
-  border-radius: var(--radius-md);
+  padding: 9px 10px;
+  border-radius: 10px;
   color: var(--text-main);
   text-decoration: none;
+  font-size: 13px;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .sidebar-link:hover {
