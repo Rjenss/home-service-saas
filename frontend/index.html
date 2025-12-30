@@ -22,46 +22,59 @@
       </nav>
     </div>
   </header>
-
-  <main class="shell">
-    <section class="panel panel-hero">
-      <div class="panel-body hero-body">
-        <div>
-          <h1 class="hero-title">Portal</h1>
-          <p class="hero-subtitle">
-            Manage jobs, scheduling, and technician assignments.
-          </p>
+    <main class="shell shell-with-sidebar">
+      <aside class="sidebar">
+        <div class="sidebar-section">
+          <h3 class="sidebar-title">Queue</h3>
+          <nav class="sidebar-nav">
+            <a href="unscheduled.html" class="sidebar-link active">
+              Unscheduled jobs
+            </a>
+            <a href="#" class="sidebar-link">
+              Add techs
+            </a>
+            <a href="#" class="sidebar-link">
+              Contact
+            </a>
+          </nav>
         </div>
+      </aside>
+
+      <div class="shell-content">
+        <section class="panel panel-hero">
+          <div class="panel-body hero-body">
+            <div>
+              <h1 class="hero-title">Portal</h1>
+              <p class="hero-subtitle">
+                Manage jobs, scheduling, and technician assignments.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-body">
+            <div class="portal-grid">
+
+              <a href="public-job.html" class="portal-card">
+                <h3>Create job</h3>
+                <p>Submit a new service request.</p>
+              </a>
+
+              <a href="calendar.html" class="portal-card">
+                <h3>Calendar</h3>
+                <p>View and manage scheduled jobs.</p>
+              </a>
+
+              <a href="technicians.html" class="portal-card">
+                <h3>Technicians</h3>
+                <p>View technicians and assignments.</p>
+              </a>
+
+            </div>
+          </div>
+        </section>
       </div>
-    </section>
-
-    <section class="panel">
-      <div class="panel-body">
-        <div class="portal-grid">
-
-          <a href="public-job.html" class="portal-card">
-            <h3>Create job</h3>
-            <p>Submit a new service request.</p>
-          </a>
-
-          <a href="calendar.html" class="portal-card">
-            <h3>Calendar</h3>
-            <p>View and manage scheduled jobs.</p>
-          </a>
-
-          <a href="technicians.html" class="portal-card">
-            <h3>Technicians</h3>
-            <p>View technicians and assignments.</p>
-          </a>
-
-          <a href="unscheduled.html" class="portal-card">
-            <h3>Unscheduled jobs</h3>
-            <p>Review jobs awaiting scheduling.</p>
-          </a>
-
-        </div>
-      </div>
-    </section>
-  </main>
+    </main>
 </body>
 </html>
