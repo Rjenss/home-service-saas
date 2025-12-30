@@ -522,7 +522,7 @@ body > header nav a {
 
 .shell-with-sidebar {
   display: grid;
-  grid-template-columns: 170px minmax(0, 1120px);
+  grid-template-columns: 150px minmax(0, 1120px);
   gap: 22px;
   align-items: start;
 }
@@ -538,7 +538,7 @@ body > header nav a {
   flex-direction: column;
 
   /* Pull it into the left highlight area, but only by a small amount */
-  margin-left: -140px;
+  margin-left: -110px;
 }
 
 .sidebar-nav {
