@@ -68,6 +68,8 @@ body.page {
   display: flex;
   align-items: center;
   gap: 10px;
+  text-decoration: none;
+  color: inherit;
 }
 
 .brand-mark {
@@ -100,11 +102,6 @@ body.page {
 .brand-subtitle {
   font-size: 12px;
   color: var(--text-soft);
-}
-
-.brand {
-  text-decoration: none;
-  color: inherit;
 }
 
 .brand:hover,
@@ -182,8 +179,20 @@ body.page {
 
 .portal-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  grid-template-columns: repeat(3, minmax(260px, 1fr));
   gap: 24px;
+}
+
+@media (max-width: 980px) {
+  .portal-grid {
+    grid-template-columns: repeat(2, minmax(240px, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .portal-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .portal-card {
@@ -199,6 +208,7 @@ body.page {
   box-shadow: 0 12px 30px rgba(15, 23, 42, 0.55);
   position: relative;
   overflow: hidden;
+  transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
 }
 
 .portal-card::before {
@@ -210,12 +220,8 @@ body.page {
   pointer-events: none;
 }
 
-.portal-card-icon {
-  font-size: 22px;
-  margin-bottom: 4px;
-}
-
-.portal-card h2 {
+.portal-card h2,
+.portal-card h3 {
   margin: 0;
   font-size: 15px;
 }
@@ -468,7 +474,6 @@ textarea {
   border-color: rgba(167, 139, 250, 0.4);
 }
 
-
 .visit-status-scheduled {
   background: rgba(56, 189, 248, 0.16);
   color: #38bdf8;
@@ -513,10 +518,13 @@ body > header nav a {
   font-size: 13px;
 }
 
+/* Sidebar layout */
+
 .shell-with-sidebar {
   display: grid;
-  grid-template-columns: 280px 1fr;
-  gap: 20px;
+  grid-template-columns: 240px minmax(0, 1120px);
+  gap: 24px;
+  align-items: start;
 }
 
 .sidebar {
@@ -525,9 +533,11 @@ body > header nav a {
   border-radius: var(--radius-lg);
   padding: 20px;
 
-  min-height: calc(100vh - 140px);
+  min-height: calc(100vh - 96px);
   display: flex;
   flex-direction: column;
+
+  margin-left: -260px;
 }
 
 .sidebar-nav {
