@@ -182,8 +182,8 @@ body.page {
 
 .portal-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 24px;
 }
 
 .portal-card {
@@ -515,21 +515,19 @@ body > header nav a {
 
 .shell-with-sidebar {
   display: grid;
-  grid-template-columns: 260px 1fr;
-  gap: 24px;
+  grid-template-columns: 280px 1fr;
+  gap: 20px;
 }
 
 .sidebar {
   background: var(--panel-bg);
   border: 1px solid var(--panel-border);
   border-radius: var(--radius-lg);
-  padding: 16px;
-}
+  padding: 20px;
 
-.sidebar-title {
-  font-size: 14px;
-  color: var(--text-soft);
-  margin-bottom: 12px;
+  min-height: calc(100vh - 140px);
+  display: flex;
+  flex-direction: column;
 }
 
 .sidebar-nav {
