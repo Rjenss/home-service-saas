@@ -224,9 +224,12 @@ body.page {
 
 .portal-card h2,
 .portal-card h3 {
-  margin: 0;
-  font-size: 15px;
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+  margin-bottom: 6px;
 }
+
 
 .portal-card p {
   margin: 4px 0;
