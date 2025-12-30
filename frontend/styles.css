@@ -209,6 +209,8 @@ body.page {
   position: relative;
   overflow: hidden;
   transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+  min-height: 140px;
+  justify-content: space-between;
 }
 
 .portal-card::before {
