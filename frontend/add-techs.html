@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Add techs</title>
+  <link rel="stylesheet" href="styles.css?v=2" />
+</head>
+<body class="page">
+  <header class="site-header">
+    <div class="site-header-inner">
+      <a href="index.html" class="brand">
+        <span class="brand-mark">T</span>
+        <div class="brand-text">
+          <span class="brand-name">Technisend</span>
+          <span class="brand-subtitle">Field service control center</span>
+        </div>
+      </a>
+      <nav class="site-nav">
+        <a href="index.html">Portal</a>
+        <a href="public-job.html">Create job</a>
+        <a href="calendar.html">Calendar</a>
+        <a href="technicians.html">Technicians</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="shell">
+    <section class="panel panel-hero">
+      <div class="panel-body hero-body">
+        <div>
+          <h1 class="hero-title">Add techs</h1>
+          <p class="hero-subtitle">Create a technician record.</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-body">
+        <h2 class="panel-title">New technician</h2>
+
+        <form id="techForm" class="job-form">
+          <div class="form-grid">
+            <div class="field">
+              <label class="field-label" for="first_name">First name</label>
+              <input id="first_name" name="first_name" type="text" placeholder="Ryan" required />
+            </div>
+
+            <div class="field">
+              <label class="field-label" for="last_name">Last name</label>
+              <input id="last_name" name="last_name" type="text" placeholder="Hotman" />
+            </div>
+
+            <div class="field">
+              <label class="field-label" for="phone">Phone</label>
+              <input id="phone" name="phone" type="tel" placeholder="5152509892" required />
+            </div>
+
+            <div class="field">
+              <label class="field-label" for="email">Email</label>
+              <input id="email" name="email" type="email" placeholder="tech@example.com" />
+            </div>
+
+            <div class="field">
+              <label class="field-label" for="skill_tags">Skill tags</label>
+              <input id="skill_tags" name="skill_tags" type="text" placeholder="PANEL_UPGRADE,EV_CHARGER" />
+            </div>
+
+            <div class="field">
+              <label class="field-label" for="active">Active</label>
+              <select id="active" name="active">
+                <option value="true" selected>True</option>
+                <option value="false">False</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-footer">
+            <button type="submit" class="btn-primary">Create technician</button>
+            <div id="techFormStatus" class="form-status"></div>
+          </div>
+        </form>
+      </div>
+    </section>
+  </main>
+
+  <script src="add-techs.js"></script>
+</body>
+</html>
