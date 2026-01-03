@@ -71,7 +71,7 @@ def lambda_handler(event, context):
 
     # Health check
     if path == "/hello" and method == "GET":
-        return response(200, {"message": "ok"})
+        return response(200, {"message": "Gateway functional"})
 
     # Customers
     if path == "/customers" and method == "POST":
