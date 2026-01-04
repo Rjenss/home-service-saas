@@ -503,6 +503,13 @@ textarea {
   border-color: rgba(248, 113, 113, 0.4);
 }
 
+.visit-status-inactive {
+  background: rgba(148, 163, 184, 0.14);
+  color: #94a3b8;
+  border-color: rgba(148, 163, 184, 0.35);
+}
+
+
 /* Basic styling for technicians page header (reuses theme) */
 
 body > header:not(.site-header) {

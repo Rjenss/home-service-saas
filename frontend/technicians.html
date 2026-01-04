@@ -29,7 +29,7 @@
         <div>
           <h1 class="hero-title">Technicians</h1>
           <p class="hero-subtitle">
-            Add technicians and view the current roster.
+            Weekly assignments by technician. This view is read only.
           </p>
         </div>
       </div>
@@ -37,58 +37,15 @@
 
     <section class="panel">
       <div class="panel-body">
-        <h2 class="panel-title">Add technician</h2>
-
-        <form id="techForm" class="job-form">
-          <div class="form-grid">
-            <div class="field">
-              <label class="field-label" for="firstName">First name</label>
-              <input type="text" id="firstName" required />
-            </div>
-
-            <div class="field">
-              <label class="field-label" for="lastName">Last name</label>
-              <input type="text" id="lastName" />
-            </div>
-
-            <div class="field">
-              <label class="field-label" for="phone">Phone</label>
-              <input type="text" id="phone" required />
-            </div>
-
-            <div class="field">
-              <label class="field-label" for="email">Email</label>
-              <input type="email" id="email" />
-            </div>
-
-            <div class="field">
-              <label class="field-label" for="skillTags">Skills (comma-separated)</label>
-              <input
-                type="text"
-                id="skillTags"
-                placeholder="PANEL_UPGRADE,EV_CHARGER"
-              />
-            </div>
-          </div>
-
-          <div class="form-footer">
-            <button class="btn-primary" type="submit">Save technician</button>
-            <div id="techFormStatus" class="form-status"></div>
-          </div>
-        </form>
-      </div>
-    </section>
-
-    <section class="panel">
-      <div class="panel-body">
         <div class="calendar-header-row">
           <div class="calendar-timezone">
-            Active technicians
+            <span id="weekRangeLabel"></span>
+            <span id="activeTechSummary"></span>
           </div>
-          <div id="techListStatus" class="calendar-status"></div>
+          <div id="techWeekStatus" class="calendar-status"></div>
         </div>
 
-        <div id="techList" class="calendar-jobs-list"></div>
+        <div id="techWeekList" class="calendar-jobs-list"></div>
       </div>
     </section>
   </main>
@@ -101,126 +58,205 @@
     }
 
     document.addEventListener("DOMContentLoaded", () => {
-      const techForm = document.getElementById("techForm");
-      const techFormStatus = document.getElementById("techFormStatus");
-      const techListStatus = document.getElementById("techListStatus");
-      const techListEl = document.getElementById("techList");
+      const statusEl = document.getElementById("techWeekStatus");
+      const listEl = document.getElementById("techWeekList");
+      const weekRangeLabelEl = document.getElementById("weekRangeLabel");
+      const activeTechSummaryEl = document.getElementById("activeTechSummary");
 
-      loadTechnicians();
+      const { weekStartIso, weekEndIsoExclusive, weekStartPretty, weekEndPretty } = getWeekBounds();
 
-      techForm.addEventListener("submit", async (e) => {
-        e.preventDefault();
+      weekRangeLabelEl.textContent = `Week: ${weekStartPretty} to ${weekEndPretty}`;
+      activeTechSummaryEl.textContent = "";
 
+      load();
+
+      async function load() {
         const baseUrl = getApiBaseUrl();
         if (!baseUrl) {
-          techFormStatus.textContent = "API base URL is not set.";
+          statusEl.textContent = "API base URL is not set.";
           return;
         }
 
-        const payload = {
-          first_name: document.getElementById("firstName").value.trim(),
-          last_name: document.getElementById("lastName").value.trim(),
-          phone: document.getElementById("phone").value.trim(),
-          email: document.getElementById("email").value.trim() || null,
-          skill_tags: document.getElementById("skillTags").value.trim() || null,
-        };
-
-        if (!payload.first_name) {
-          techFormStatus.textContent = "First name is required.";
-          return;
-        }
-        if (!payload.phone) {
-          techFormStatus.textContent = "Phone is required.";
-          return;
-        }
-
-        techFormStatus.textContent = "Saving technician...";
+        statusEl.textContent = "Loading technicians and assignments...";
+        listEl.innerHTML = "";
 
         try {
-          const res = await fetch(`${baseUrl}/technicians`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
+          const [techRes, visitRes, jobsRes] = await Promise.all([
+            fetch(`${baseUrl}/technicians`, { method: "GET" }),
+            fetch(`${baseUrl}/job_visits`, { method: "GET" }),
+            fetch(`${baseUrl}/jobs`, { method: "GET" }),
+          ]);
+
+          if (!techRes.ok) throw new Error(`Technicians HTTP ${techRes.status}`);
+          if (!visitRes.ok) throw new Error(`Job visits HTTP ${visitRes.status}`);
+          if (!jobsRes.ok) throw new Error(`Jobs HTTP ${jobsRes.status}`);
+
+          const technicians = await techRes.json();
+          const visits = await visitRes.json();
+          const jobs = await jobsRes.json();
+
+          const techList = Array.isArray(technicians) ? technicians : [];
+          const allVisits = Array.isArray(visits) ? visits : [];
+          const allJobs = Array.isArray(jobs) ? jobs : [];
+
+          const jobsById = {};
+          for (const job of allJobs) {
+            if (job && job.jobId) jobsById[job.jobId] = job;
+          }
+
+          const weekVisits = allVisits.filter(v => {
+            const d = v && v.scheduled_date;
+            if (!d) return false;
+            return d >= weekStartIso && d < weekEndIsoExclusive;
           });
 
-          const text = await res.text();
-          if (!res.ok) {
-            techFormStatus.textContent = `Error: ${res.status} ${text}`;
-            return;
-          }
+          render(techList, weekVisits, jobsById);
 
-          techFormStatus.textContent = "Technician saved.";
-          techForm.reset();
-          await loadTechnicians();
+          const activeCount = techList.filter(t => !!t.active).length;
+          activeTechSummaryEl.textContent = ` | Active techs: ${activeCount}/${techList.length}`;
+          statusEl.textContent = "";
         } catch (err) {
-          techFormStatus.textContent = `Error: ${String(err)}`;
-        }
-      });
-
-      async function loadTechnicians() {
-        const baseUrl = getApiBaseUrl();
-        if (!baseUrl) {
-          techListStatus.textContent = "API base URL is not set.";
-          techListEl.textContent = "";
-          return;
-        }
-
-        techListStatus.textContent = "Loading...";
-        techListEl.textContent = "";
-
-        try {
-          const res = await fetch(`${baseUrl}/technicians`, { method: "GET" });
-
-          const text = await res.text();
-          if (!res.ok) {
-            techListStatus.textContent = `Error: ${res.status}`;
-            techListEl.textContent = text;
-            return;
-          }
-
-          const technicians = JSON.parse(text);
-          renderTechnicians(technicians);
-          techListStatus.textContent = "";
-        } catch (err) {
-          techListStatus.textContent = "Error loading technicians.";
-          techListEl.textContent = String(err);
+          statusEl.textContent = "Error loading technician assignments.";
+          listEl.textContent = String(err);
         }
       }
 
-      function renderTechnicians(techs) {
-        techListEl.innerHTML = "";
+      function render(techs, weekVisits, jobsById) {
+        listEl.innerHTML = "";
 
-        if (!techs || techs.length === 0) {
+        if (!techs.length) {
           const empty = document.createElement("div");
           empty.className = "calendar-empty";
-          empty.textContent = "No technicians yet.";
-          techListEl.appendChild(empty);
+          empty.textContent = "No technicians found.";
+          listEl.appendChild(empty);
           return;
         }
 
-        for (const tech of techs) {
-          const div = document.createElement("div");
-          div.className = "job-card visit-card";
+        // Group visits by technician_id
+        const visitsByTechId = {};
+        for (const v of weekVisits) {
+          const tid = v.technician_id || "UNASSIGNED";
+          if (!visitsByTechId[tid]) visitsByTechId[tid] = [];
+          visitsByTechId[tid].push(v);
+        }
 
-          const name = `${tech.first_name || ""} ${tech.last_name || ""}`.trim();
-          const phone = tech.phone || "";
-          const email = tech.email || "";
-          const skills = tech.skill_tags || "";
+        // Sort techs: active first, then by name
+        const sortedTechs = [...techs].sort((a, b) => {
+          const aa = a.active ? 0 : 1;
+          const bb = b.active ? 0 : 1;
+          if (aa !== bb) return aa - bb;
+          const an = `${a.first_name || ""} ${a.last_name || ""}`.trim().toLowerCase();
+          const bn = `${b.first_name || ""} ${b.last_name || ""}`.trim().toLowerCase();
+          return an.localeCompare(bn);
+        });
 
-          div.innerHTML = `
-            <div class="job-card-header">
-              <div>${escapeHtml(name || "Technician")}</div>
-              <div class="visit-status visit-status-scheduled">active</div>
-            </div>
-            <div class="job-card-body">
-              <div class="visit-job-id">Phone: ${escapeHtml(phone)}</div>
-              <div>Email: ${escapeHtml(email)}</div>
-              <div class="visit-notes">Skills: ${escapeHtml(skills)}</div>
+        for (const tech of sortedTechs) {
+          const techId = tech.id;
+          const techName = `${tech.first_name || ""} ${tech.last_name || ""}`.trim() || "Technician";
+          const techActive = !!tech.active;
+
+          const section = document.createElement("section");
+          section.className = "calendar-tech-section";
+
+          const heading = document.createElement("div");
+          heading.className = "job-card-header";
+          heading.innerHTML = `
+            <div>${escapeHtml(techName)}</div>
+            <div class="visit-status ${techActive ? "visit-status-scheduled" : "visit-status-inactive"}">
+              ${techActive ? "active" : "inactive"}
             </div>
           `;
+          section.appendChild(heading);
 
-          techListEl.appendChild(div);
+          const sub = document.createElement("div");
+          sub.className = "job-card-body";
+          sub.innerHTML = `
+            <div>Phone: ${escapeHtml(tech.phone || "")}</div>
+            <div>Email: ${escapeHtml(tech.email || "")}</div>
+          `;
+          section.appendChild(sub);
+
+          const assigned = (visitsByTechId[techId] || []).sort((a, b) => {
+            const da = (a.scheduled_date || "");
+            const db = (b.scheduled_date || "");
+            if (da !== db) return da.localeCompare(db);
+            const ta = (a.scheduled_time || "").padStart(5, "9");
+            const tb = (b.scheduled_time || "").padStart(5, "9");
+            return ta.localeCompare(tb);
+          });
+
+          if (!assigned.length) {
+            const none = document.createElement("div");
+            none.className = "calendar-empty";
+            none.textContent = "No assigned jobs this week.";
+            section.appendChild(none);
+          } else {
+            const list = document.createElement("div");
+            list.className = "calendar-day-list";
+
+            for (const v of assigned) {
+              const job = jobsById[v.job_id] || {};
+              const timeText = v.scheduled_time || "Time not set";
+              const dateText = v.scheduled_date || "";
+              const customer = job.customerName || "Customer";
+              const address = job.address || "";
+              const notes = (job.description || v.notes || "").trim();
+
+              const card = document.createElement("article");
+              card.className = "job-card visit-card";
+              card.innerHTML = `
+                <div class="job-card-header">
+                  <span>${escapeHtml(dateText)} ${escapeHtml(timeText)}</span>
+                  <span class="visit-status visit-status-${escapeHtml((v.status || "scheduled").toLowerCase())}">
+                    ${escapeHtml(v.status || "scheduled")}
+                  </span>
+                </div>
+                <div class="job-card-body">
+                  <div class="visit-job-id">${escapeHtml(customer)}</div>
+                  <div>${escapeHtml(address)}</div>
+                  <div class="visit-notes">${escapeHtml(notes || "No notes")}</div>
+                </div>
+              `;
+              list.appendChild(card);
+            }
+
+            section.appendChild(list);
+          }
+
+          listEl.appendChild(section);
         }
+      }
+
+      function getWeekBounds() {
+        // Week starts Monday. Use local time.
+        const now = new Date();
+        const day = now.getDay(); // 0 Sun, 1 Mon
+        const diffToMonday = (day === 0 ? -6 : 1) - day;
+
+        const monday = new Date(now);
+        monday.setHours(0, 0, 0, 0);
+        monday.setDate(monday.getDate() + diffToMonday);
+
+        const nextMonday = new Date(monday);
+        nextMonday.setDate(nextMonday.getDate() + 7);
+
+        const weekStartIso = toIsoDate(monday);
+        const weekEndIsoExclusive = toIsoDate(nextMonday);
+
+        const fmt = new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric" });
+        const weekStartPretty = fmt.format(monday);
+        const sunday = new Date(nextMonday);
+        sunday.setDate(sunday.getDate() - 1);
+        const weekEndPretty = fmt.format(sunday);
+
+        return { weekStartIso, weekEndIsoExclusive, weekStartPretty, weekEndPretty };
+      }
+
+      function toIsoDate(d) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const day = String(d.getDate()).padStart(2, "0");
+        return `${y}-${m}-${day}`;
       }
 
       function escapeHtml(value) {
