@@ -2,7 +2,9 @@ import json
 import os
 import uuid
 import logging
-from datetime import datetime, timezone
+import secrets
+from datetime import datetime, timezone, timedelta
+from urllib.parse import parse_qs
 
 import boto3
 from boto3.dynamodb.conditions import Attr
@@ -11,6 +13,13 @@ logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
 dynamodb = boto3.resource("dynamodb")
+
+# SES Client
+ses = boto3.client("ses")
+SENDER_EMAIL = os.environ.get("SENDER_EMAIL")  # verified in SES
+APP_PUBLIC_BASE_URL = os.environ.get("APP_PUBLIC_BASE_URL")  # e.g. https://yourdomain.com
+CONFIRM_TOKEN_TTL_HOURS = int(os.environ.get("CONFIRM_TOKEN_TTL_HOURS", "48"))
+
 
 # One org per deployment or stack
 ORGANIZATION_ID = os.environ.get("ORGANIZATION_ID", "org_pilot")
@@ -96,6 +105,9 @@ def lambda_handler(event, context):
         return create_job_visit(event)
     if path == "/job_visits" and method == "GET":
         return list_job_visits()
+    
+    if path == "/confirm" and method == "GET":
+        return confirm_job(event)
 
     return response(404, {"message": "Not found"})
 
@@ -241,6 +253,7 @@ def get_or_create_customer(full_name: str, phone: str, address: str | None = Non
 
 
 def create_job(event):
+    
     """
     Create a job from UI data.
 
@@ -263,12 +276,14 @@ def create_job(event):
     Job visit creation:
       - If final status is Scheduled and date and time exist, create an initial Job Visit record
     """
+    
     body = safe_json_body(event)
     if body is None:
         return response(400, {"message": "Invalid JSON body"})
 
     customer_name = (body.get("customerName") or body.get("full_name") or "").strip()
     customer_phone = normalize_phone(body.get("customerPhone") or body.get("phone") or "")
+    customer_email = (body.get("customerEmail") or body.get("email") or "").strip()
     description = body.get("description") or body.get("problem") or ""
     address = body.get("address")
     priority = body.get("priority", "normal")
@@ -280,6 +295,8 @@ def create_job(event):
         return response(400, {"message": "customerName is required"})
     if not customer_phone:
         return response(400, {"message": "customerPhone is required"})
+    if not customer_email:
+        return response(400, {"message": "customerEmail is required for confirmation"})
 
     customer = get_or_create_customer(customer_name, customer_phone, address)
     customer_id = customer["id"]
@@ -287,11 +304,8 @@ def create_job(event):
     now = now_utc_iso()
     job_id = str(uuid.uuid4())
 
-    incoming_status = body.get("status")
-    if isinstance(incoming_status, str) and incoming_status.strip():
-        job_status = incoming_status.strip()
-    else:
-        job_status = "Scheduled" if (date_str and time_str) else "Unscheduled"
+    confirm_token = secrets.token_urlsafe(24)
+    expires_at = (datetime.now(timezone.utc) + timedelta(hours=CONFIRM_TOKEN_TTL_HOURS)).isoformat()
 
     job_item = {
         "jobId": job_id,
@@ -299,28 +313,34 @@ def create_job(event):
         "customer_id": customer_id,
         "customerName": customer_name,
         "customerPhone": customer_phone,
+        "customerEmail": customer_email,
         "address": address,
         "description": description,
-        "status": job_status,
+        "status": "Unscheduled",
         "priority": priority,
         "requested_date": date_str,
         "requested_time": time_str,
+        "confirm_token": confirm_token,
+        "confirm_token_expires_at": expires_at,
+        "confirmed_at": None,
         "created_at": now,
         "updated_at": now,
     }
 
     jobs_table.put_item(Item=job_item)
 
-    if job_status == "Scheduled" and date_str and time_str:
-        create_initial_job_visit_for_job(
-            job_id=job_id,
-            date_str=date_str,
-            time_str=time_str,
-            notes=description,
-        )
+    confirm_url = f"{getApiBaseUrl_from_env()}/confirm?token={confirm_token}"
+    # If you prefer the link to go to your frontend first, use APP_PUBLIC_BASE_URL and have it call the API
+    # confirm_url = f"{APP_PUBLIC_BASE_URL}/confirm.html?token={confirm_token}"
 
-    # Return flat job item so frontend can read createdJob.jobId
+    send_confirmation_email(
+        to_email=customer_email,
+        customer_name=customer_name,
+        confirm_url=confirm_url,
+    )
+
     return response(201, job_item)
+
 
 
 def list_jobs():
@@ -328,6 +348,59 @@ def list_jobs():
         FilterExpression=Attr("organization_id").eq(ORGANIZATION_ID)
     )
     return response(200, resp.get("Items", []))
+
+def confirm_job(event):
+    q = get_query_params(event)
+    token = (q.get("token") or "").strip()
+    if not token:
+        return response(400, {"message": "Missing token"})
+
+    # Find job by scanning for confirm_token
+    # For production scale, you would use a GSI on confirm_token, but scan is fine for MVP.
+    resp = jobs_table.scan(
+        FilterExpression=Attr("organization_id").eq(ORGANIZATION_ID) & Attr("confirm_token").eq(token)
+    )
+    items = resp.get("Items", [])
+    if not items:
+        return response(404, {"message": "Invalid token"})
+
+    job = items[0]
+
+    expires_at = job.get("confirm_token_expires_at")
+    if expires_at:
+        exp = datetime.fromisoformat(expires_at.replace("Z", "+00:00"))
+        if datetime.now(timezone.utc) > exp:
+            return response(410, {"message": "Token expired"})
+
+    if job.get("confirmed_at"):
+        return response(200, {"message": "Already confirmed"})
+
+    now = now_utc_iso()
+
+    jobs_table.update_item(
+        Key={"jobId": job["jobId"]},
+        UpdateExpression="SET #s = :s, confirmed_at = :c, updated_at = :u",
+        ExpressionAttributeNames={"#s": "status"},
+        ExpressionAttributeValues={":s": "Scheduled", ":c": now, ":u": now},
+    )
+
+    # Create initial visit now if preferred date and time exist
+    date_str = job.get("requested_date")
+    time_str = job.get("requested_time")
+    if date_str and time_str:
+        create_initial_job_visit_for_job(
+            job_id=job["jobId"],
+            date_str=date_str,
+            time_str=time_str,
+            notes=job.get("description") or "",
+        )
+
+    # Return a simple success page response for browser clicks
+    return {
+        "statusCode": 200,
+        "headers": {"Content-Type": "text/html", "Access-Control-Allow-Origin": "*"},
+        "body": "<html><body><h2>Confirmed</h2><p>Your request is confirmed. You may close this tab.</p></body></html>",
+    }
 
 
 # ---------- JOB VISITS ----------
@@ -498,6 +571,36 @@ def list_technicians():
         FilterExpression=Attr("organization_id").eq(ORGANIZATION_ID)
     )
     return response(200, resp.get("Items", []))
+
+# ---------- SES ----------
+
+
+def get_query_params(event):
+    # Works for API Gateway REST "queryStringParameters" and also raw queryString if present
+    q = event.get("queryStringParameters") or {}
+    if q:
+        return q
+    raw = event.get("rawQueryString") or ""
+    parsed = parse_qs(raw)
+    return {k: v[0] for k, v in parsed.items()}
+
+def send_confirmation_email(to_email: str, customer_name: str, confirm_url: str):
+    subject = "Please confirm your service request"
+    body_text = (
+        f"Hi {customer_name},\n\n"
+        f"Please confirm your service request by clicking this link:\n"
+        f"{confirm_url}\n\n"
+        f"If you did not request service, you can ignore this email.\n"
+    )
+
+    ses.send_email(
+        Source=SENDER_EMAIL,
+        Destination={"ToAddresses": [to_email]},
+        Message={
+            "Subject": {"Data": subject, "Charset": "UTF-8"},
+            "Body": {"Text": {"Data": body_text, "Charset": "UTF-8"}},
+        },
+    )
 
 
 # ---------- RESPONSE HELPER ----------
