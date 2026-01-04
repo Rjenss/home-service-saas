@@ -20,7 +20,6 @@ document.addEventListener("DOMContentLoaded", () => {
       phone: document.getElementById("phone").value.trim(),
       email: document.getElementById("email").value.trim(),
       skill_tags: document.getElementById("skill_tags").value.trim(),
-      active: document.getElementById("active").value === "true",
     };
 
     try {
