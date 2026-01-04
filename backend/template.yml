@@ -93,10 +93,8 @@ Resources:
           TECHNICIANS_TABLE: !Ref TechniciansTable
           JOB_VISITS_TABLE:  !Ref JobVisitsTable
           ORGANIZATION_ID:   org_pilot
-
-      SENDER_EMAIL: technisend@gmail.com
-      CONFIRM_TOKEN_TTL_HOURS: "48"
-
+          SENDER_EMAIL:      technisend@gmail.com
+          CONFIRM_TOKEN_TTL_HOURS: "48"
 
       Policies:
         - DynamoDBCrudPolicy:
@@ -107,23 +105,28 @@ Resources:
             TableName: !Ref TechniciansTable
         - DynamoDBCrudPolicy:
             TableName: !Ref JobVisitsTable
+            
+        - Statement:
+            - Effect: Allow
+              Action:
+                - ses:SendEmail
+                - ses:SendRawEmail
+              Resource: "*"
+
+
       Events:
-        # Root path - so GET / works
         RootGet:
           Type: Api
           Properties:
             RestApiId: !Ref ApiGateway
             Path: /
             Method: get
-
         HelloApi:
           Type: Api
           Properties:
             RestApiId: !Ref ApiGateway
             Path: /hello
             Method: get
-
-        # Jobs endpoints
         JobsGet:
           Type: Api
           Properties:
@@ -136,8 +139,6 @@ Resources:
             RestApiId: !Ref ApiGateway
             Path: /jobs
             Method: post
-
-        # Customers endpoints
         CustomersGet:
           Type: Api
           Properties:
@@ -150,8 +151,6 @@ Resources:
             RestApiId: !Ref ApiGateway
             Path: /customers
             Method: post
-
-        # Technicians endpoints
         TechniciansGet:
           Type: Api
           Properties:
@@ -164,8 +163,6 @@ Resources:
             RestApiId: !Ref ApiGateway
             Path: /technicians
             Method: post
-
-        # JobVisits endpoints
         JobVisitsGet:
           Type: Api
           Properties:
@@ -178,8 +175,17 @@ Resources:
             RestApiId: !Ref ApiGateway
             Path: /job_visits
             Method: post
+        ConfirmGet:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /confirm
+            Method: get
+
+
 
 Outputs:
   ApiUrl:
-    Description: "API base URL"
+    Description: API base URL
     Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/Prod"
+
