@@ -95,6 +95,7 @@ Resources:
           ORGANIZATION_ID:   org_pilot
           SENDER_EMAIL:      technisend@gmail.com
           CONFIRM_TOKEN_TTL_HOURS: "48"
+          API_BASE_URL: https://fdho6lafwk.execute-api.us-east-2.amazonaws.com/Prod
 
       Policies:
         - DynamoDBCrudPolicy:

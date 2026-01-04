@@ -329,15 +329,20 @@ def create_job(event):
 
     jobs_table.put_item(Item=job_item)
 
-    confirm_url = f"{getApiBaseUrl_from_env()}/confirm?token={confirm_token}"
+    api_base_url = os.environ.get("API_BASE_URL", "").rstrip("/")
+    confirm_url = f"{api_base_url}/confirm?token={confirm_token}"
     # If you prefer the link to go to your frontend first, use APP_PUBLIC_BASE_URL and have it call the API
     # confirm_url = f"{APP_PUBLIC_BASE_URL}/confirm.html?token={confirm_token}"
 
-    send_confirmation_email(
-        to_email=customer_email,
-        customer_name=customer_name,
-        confirm_url=confirm_url,
-    )
+    try:
+        send_confirmation_email(
+            to_email=customer_email,
+            customer_name=customer_name,
+            confirm_url=confirm_url,
+        )
+    except Exception as e:
+        logger.exception("Failed to send confirmation email")
+
 
     return response(201, job_item)
 
