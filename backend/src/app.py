@@ -590,6 +590,9 @@ def get_query_params(event):
     return {k: v[0] for k, v in parsed.items()}
 
 def send_confirmation_email(to_email: str, customer_name: str, confirm_url: str):
+    if not SENDER_EMAIL:
+        raise ValueError("SENDER_EMAIL environment variable is not set")
+
     subject = "Please confirm your service request"
     body_text = (
         f"Hi {customer_name},\n\n"
@@ -598,14 +601,29 @@ def send_confirmation_email(to_email: str, customer_name: str, confirm_url: str)
         f"If you did not request service, you can ignore this email.\n"
     )
 
-    ses.send_email(
-        Source=SENDER_EMAIL,
-        Destination={"ToAddresses": [to_email]},
-        Message={
-            "Subject": {"Data": subject, "Charset": "UTF-8"},
-            "Body": {"Text": {"Data": body_text, "Charset": "UTF-8"}},
-        },
+    logger.info(
+        "About to send confirmation email. from=%s to=%s confirm_url=%s",
+        SENDER_EMAIL,
+        to_email,
+        confirm_url,
     )
+
+    try:
+        resp = ses.send_email(
+            Source=SENDER_EMAIL,
+            Destination={"ToAddresses": [to_email]},
+            Message={
+                "Subject": {"Data": subject, "Charset": "UTF-8"},
+                "Body": {"Text": {"Data": body_text, "Charset": "UTF-8"}},
+            },
+        )
+        logger.info("SES send_email success. MessageId=%s", resp.get("MessageId"))
+        return resp
+
+    except Exception:
+        logger.exception("SES send_email failed")
+        raise
+
 
 
 # ---------- RESPONSE HELPER ----------
