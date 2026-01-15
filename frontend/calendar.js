@@ -14,26 +14,25 @@ document.addEventListener("DOMContentLoaded", () => {
   const nextDayBtn = document.getElementById("nextDayBtn");
 
   let allVisits = [];
-  let selectedDate = getTodayIso(); // "YYYY-MM-DD" (CST)
+  let allTechs = [];
+  let techById = {};
+  let selectedDate = getTodayIso(); // "YYYY-MM-DD"
 
   init();
 
   function init() {
     updateCurrentDayLabel();
+
     if (prevDayBtn) {
-      prevDayBtn.addEventListener("click", () => {
-        changeDay(-1);
-      });
+      prevDayBtn.addEventListener("click", () => changeDay(-1));
     }
     if (nextDayBtn) {
-      nextDayBtn.addEventListener("click", () => {
-        changeDay(1);
-      });
+      nextDayBtn.addEventListener("click", () => changeDay(1));
     }
-    loadJobVisitsForCalendar();
+
+    loadCalendarData();
   }
 
-  // Today in local time as "YYYY-MM-DD"
   function getTodayIso() {
     const now = new Date();
     const y = now.getFullYear();
@@ -42,10 +41,9 @@ document.addEventListener("DOMContentLoaded", () => {
     return `${y}-${m}-${d}`;
   }
 
-  // Move selected date by offset days (-1 = previous, +1 = next)
   function changeDay(offset) {
     const [y, m, d] = selectedDate.split("-").map(Number);
-    const date = new Date(y, m - 1, d); // local date
+    const date = new Date(y, m - 1, d);
     date.setDate(date.getDate() + offset);
 
     const newY = date.getFullYear();
@@ -57,7 +55,6 @@ document.addEventListener("DOMContentLoaded", () => {
     renderVisitsForSelectedDay();
   }
 
-  // Update the big label at the top
   function updateCurrentDayLabel() {
     if (!currentDayLabelEl) return;
 
@@ -74,7 +71,7 @@ document.addEventListener("DOMContentLoaded", () => {
     currentDayLabelEl.textContent = formatter.format(date);
   }
 
-  async function loadJobVisitsForCalendar() {
+  async function loadCalendarData() {
     const baseUrl = getApiBaseUrl();
     if (!baseUrl) {
       if (statusEl) {
@@ -85,27 +82,107 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (statusEl) {
-      statusEl.textContent = "Loading job visits...";
+      statusEl.textContent = "Loading calendar data...";
     }
 
     try {
-      const resp = await fetch(`${baseUrl}/job_visits`, {
-        method: "GET",
-      });
+      const [visitsResp, techResp] = await Promise.all([
+        fetch(`${baseUrl}/job_visits`, { method: "GET" }),
+        fetch(`${baseUrl}/technicians`, { method: "GET" }),
+      ]);
 
-      if (!resp.ok) {
-        throw new Error(`HTTP ${resp.status}`);
+      if (!visitsResp.ok) throw new Error(`job_visits HTTP ${visitsResp.status}`);
+      if (!techResp.ok) throw new Error(`technicians HTTP ${techResp.status}`);
+
+      const visitsData = await visitsResp.json();
+      const techsData = await techResp.json();
+
+      allVisits = Array.isArray(visitsData) ? visitsData : [];
+      allTechs = Array.isArray(techsData) ? techsData : [];
+
+      techById = {};
+      for (const t of allTechs) {
+        if (t && t.id) techById[t.id] = t;
       }
-
-      const data = await resp.json();
-      allVisits = Array.isArray(data) ? data : [];
 
       renderVisitsForSelectedDay();
     } catch (err) {
-      console.error("Error loading job visits:", err);
+      console.error("Error loading calendar data:", err);
       if (statusEl) {
-        statusEl.textContent = "Error loading job visits. Check console logs.";
+        statusEl.textContent = "Error loading calendar data. Check console logs.";
       }
+    }
+  }
+
+  function techNameFromId(techId) {
+    if (!techId) return "Unassigned";
+    const t = techById[techId];
+    if (!t) return "Unassigned";
+    const name = `${t.first_name || ""} ${t.last_name || ""}`.trim();
+    return name || "Unassigned";
+  }
+
+  function populateTechSelect(selectEl, techs, selectedTechId) {
+    selectEl.innerHTML = "";
+
+    const optNone = document.createElement("option");
+    optNone.value = "";
+    optNone.textContent = "Unassigned";
+    selectEl.appendChild(optNone);
+
+    const sorted = [...(techs || [])].sort((a, b) => {
+      const an = `${a.first_name || ""} ${a.last_name || ""}`.trim().toLowerCase();
+      const bn = `${b.first_name || ""} ${b.last_name || ""}`.trim().toLowerCase();
+      return an.localeCompare(bn);
+    });
+
+    for (const tech of sorted) {
+      if (!tech || !tech.id) continue;
+      const opt = document.createElement("option");
+      opt.value = tech.id;
+      opt.textContent =
+        `${tech.first_name || ""} ${tech.last_name || ""}`.trim() || "Technician";
+      selectEl.appendChild(opt);
+    }
+
+    selectEl.value = selectedTechId || "";
+  }
+
+  async function assignTechToVisit({ visitId, technicianId, selectEl }) {
+    const baseUrl = getApiBaseUrl();
+    if (!baseUrl) return;
+
+    selectEl.disabled = true;
+
+    try {
+      const resp = await fetch(`${baseUrl}/job_visits/assign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          visit_id: visitId,
+          technician_id: technicianId,
+        }),
+      });
+
+      const updated = await resp.json();
+
+      if (!resp.ok) {
+        console.error("Assign failed:", updated);
+        if (statusEl) statusEl.textContent = "Assign failed. Check console logs.";
+        return;
+      }
+
+      const idx = allVisits.findIndex(v => v && v.id === visitId);
+      if (idx >= 0) {
+        allVisits[idx] = { ...allVisits[idx], ...updated };
+      }
+
+      renderVisitsForSelectedDay();
+    } catch (err) {
+      console.error("Error assigning technician:", err);
+      if (statusEl) statusEl.textContent = "Error assigning technician. Check console logs.";
+    } finally {
+      selectEl.disabled = false;
     }
   }
 
@@ -113,9 +190,8 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!calendarEl) return;
     calendarEl.innerHTML = "";
 
-    // Filter to the selected date
     const visits = allVisits
-      .filter(v => v.scheduled_date === selectedDate)
+      .filter(v => v && v.scheduled_date === selectedDate)
       .sort((a, b) => {
         const ta = (a.scheduled_time || "").padStart(5, "9");
         const tb = (b.scheduled_time || "").padStart(5, "9");
@@ -125,11 +201,9 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
     if (statusEl) {
-      if (!visits.length) {
-        statusEl.textContent = `No visits scheduled for ${selectedDate}.`;
-      } else {
-        statusEl.textContent = `Showing ${visits.length} visit(s) for ${selectedDate}.`;
-      }
+      statusEl.textContent = visits.length
+        ? `Showing ${visits.length} visit(s) for ${selectedDate}.`
+        : `No visits scheduled for ${selectedDate}.`;
     }
 
     if (!visits.length) {
@@ -140,29 +214,29 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    // Group by technician
+    // Group by technician name (derived from technician_id)
     const byTech = {};
     for (const visit of visits) {
-      const techLabel =
-        visit.technician_name ||
-        visit.technician_id ||
-        "Unassigned";
-      if (!byTech[techLabel]) {
-        byTech[techLabel] = [];
-      }
-      byTech[techLabel].push(visit);
+      const label = techNameFromId(visit.technician_id);
+      if (!byTech[label]) byTech[label] = [];
+      byTech[label].push(visit);
     }
 
-    for (const techLabel of Object.keys(byTech)) {
+    // Sort sections: Unassigned first, then alphabetical
+    const techLabels = Object.keys(byTech).sort((a, b) => {
+      if (a === "Unassigned" && b !== "Unassigned") return -1;
+      if (b === "Unassigned" && a !== "Unassigned") return 1;
+      return a.toLowerCase().localeCompare(b.toLowerCase());
+    });
+
+    for (const techLabel of techLabels) {
       const section = document.createElement("section");
       section.className = "calendar-tech-section";
 
       const heading = document.createElement("h2");
       heading.className = "calendar-tech-heading";
       heading.textContent =
-        techLabel === "Unassigned"
-          ? "Unassigned visits"
-          : `Technician: ${techLabel}`;
+        techLabel === "Unassigned" ? "Unassigned visits" : `Technician: ${techLabel}`;
       section.appendChild(heading);
 
       const list = document.createElement("div");
@@ -182,12 +256,15 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const statusText = visit.status || "scheduled";
 
-        header.innerHTML = `
-          <span>${timeText}</span>
-          <span class="visit-status visit-status-${statusText.toLowerCase()}">
-            ${statusText}
-          </span>
-        `;
+        const leftSpan = document.createElement("span");
+        leftSpan.textContent = timeText;
+
+        const rightSpan = document.createElement("span");
+        rightSpan.className = `visit-status visit-status-${String(statusText).toLowerCase()}`;
+        rightSpan.textContent = statusText;
+
+        header.appendChild(leftSpan);
+        header.appendChild(rightSpan);
 
         const body = document.createElement("div");
         body.className = "job-card-body";
@@ -195,10 +272,40 @@ document.addEventListener("DOMContentLoaded", () => {
         const jobId = visit.job_id || "N/A";
         const notesText = visit.notes || "";
 
-        body.innerHTML = `
-          <div class="visit-job-id">Job: ${jobId}</div>
-          <div class="visit-notes">${notesText || "No notes"}</div>
-        `;
+        const jobLine = document.createElement("div");
+        jobLine.className = "visit-job-id";
+        jobLine.textContent = `Job: ${jobId}`;
+
+        const notesLine = document.createElement("div");
+        notesLine.className = "visit-notes";
+        notesLine.textContent = notesText || "No notes";
+
+        body.appendChild(jobLine);
+        body.appendChild(notesLine);
+
+        // Assigned to dropdown
+        const assignRow = document.createElement("div");
+        assignRow.className = "visit-assign-row";
+
+        const assignLabel = document.createElement("div");
+        assignLabel.className = "visit-assign-label";
+        assignLabel.textContent = "Assigned to:";
+
+        const select = document.createElement("select");
+        select.className = "visit-assign-select";
+        populateTechSelect(select, allTechs, visit.technician_id);
+
+        select.addEventListener("change", async () => {
+          await assignTechToVisit({
+            visitId: visit.id,
+            technicianId: select.value ? select.value : null,
+            selectEl: select,
+          });
+        });
+
+        assignRow.appendChild(assignLabel);
+        assignRow.appendChild(select);
+        body.appendChild(assignRow);
 
         card.appendChild(header);
         card.appendChild(body);

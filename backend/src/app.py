@@ -108,6 +108,9 @@ def lambda_handler(event, context):
     
     if path == "/confirm" and method == "GET":
         return confirm_job(event)
+    
+    if path == "/job_visits/assign" and method == "POST":
+        return assign_job_visit(event)
 
     return response(404, {"message": "Not found"})
 
@@ -576,6 +579,61 @@ def list_technicians():
         FilterExpression=Attr("organization_id").eq(ORGANIZATION_ID)
     )
     return response(200, resp.get("Items", []))
+
+def assign_job_visit(event):
+    """Assign or unassign a technician on an existing job visit.
+
+    Endpoint:
+      POST /job_visits/assign
+
+    Expected JSON body:
+      {
+        "visit_id": "...",            # required (job_visits.id)
+        "technician_id": "..."        # optional; null/"" unassigns
+      }
+
+    Returns:
+      200 + updated visit item
+    """
+    body = safe_json_body(event)
+    if body is None:
+        return response(400, {"message": "Invalid JSON body"})
+
+    visit_id = (body.get("visit_id") or body.get("id") or "").strip()
+    if not visit_id:
+        return response(400, {"message": "visit_id is required"})
+
+    tech_id_raw = body.get("technician_id")
+    technician_id = None
+    if isinstance(tech_id_raw, str):
+        technician_id = tech_id_raw.strip() or None
+    elif tech_id_raw is None:
+        technician_id = None
+    else:
+        technician_id = str(tech_id_raw).strip() or None
+
+    # Validate the visit exists and belongs to this org
+    current = job_visits_table.get_item(Key={"id": visit_id}).get("Item")
+    if not current or current.get("organization_id") != ORGANIZATION_ID:
+        return response(404, {"message": "Visit not found"})
+
+    # Optional: if a non-empty tech id is provided, verify the tech exists in this org
+    if technician_id:
+        tech = technicians_table.get_item(Key={"id": technician_id}).get("Item")
+        if not tech or tech.get("organization_id") != ORGANIZATION_ID:
+            return response(400, {"message": "Invalid technician_id"})
+
+    now = now_utc_iso()
+
+    job_visits_table.update_item(
+        Key={"id": visit_id},
+        UpdateExpression="SET technician_id = :t, updated_at = :u",
+        ExpressionAttributeValues={":t": technician_id, ":u": now},
+    )
+
+    updated = job_visits_table.get_item(Key={"id": visit_id}).get("Item")
+    return response(200, updated or {"id": visit_id, "technician_id": technician_id})
+
 
 # ---------- SES ----------
 
