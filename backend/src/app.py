@@ -212,13 +212,14 @@ def list_customers():
     return response(200, resp.get("Items", []))
 
 
-def get_or_create_customer(full_name: str, phone: str, address: str | None = None):
+def get_or_create_customer(full_name: str, phone: str, address: str | None = None, email: str | None = None):
     """
     Look up a customer by normalized phone and organization.
     If found, return it.
     If not, create a new minimal customer.
 
     If address is provided and this is a new customer, store it in address_line1.
+    If email is provided, store/update it.
     """
     phone_norm = normalize_phone(phone)
 
@@ -228,7 +229,32 @@ def get_or_create_customer(full_name: str, phone: str, address: str | None = Non
     )
     items = resp.get("Items", [])
     if items:
-        return items[0]
+        customer = items[0]
+        updates = []
+        attrs = {}
+        if email and email.strip() and customer.get("email") != email.strip():
+            updates.append("email = :email")
+            attrs[":email"] = email.strip()
+            customer["email"] = email.strip()
+        if address and address.strip() and not customer.get("address_line1"):
+            updates.append("address_line1 = :addr")
+            attrs[":addr"] = address.strip()
+            customer["address_line1"] = address.strip()
+        if full_name and full_name.strip() and not customer.get("full_name"):
+            updates.append("full_name = :name")
+            attrs[":name"] = full_name.strip()
+            customer["full_name"] = full_name.strip()
+
+        if updates:
+            now = now_utc_iso()
+            updates.append("updated_at = :updated_at")
+            attrs[":updated_at"] = now
+            customers_table.update_item(
+                Key={"id": customer["id"]},
+                UpdateExpression="SET " + ", ".join(updates),
+                ExpressionAttributeValues=attrs,
+            )
+        return customer
 
     now = now_utc_iso()
     customer_id = str(uuid.uuid4())
@@ -238,7 +264,7 @@ def get_or_create_customer(full_name: str, phone: str, address: str | None = Non
         "organization_id": ORGANIZATION_ID,
         "full_name": (full_name or "").strip(),
         "phone": phone_norm,
-        "email": None,
+        "email": email.strip() if email else None,
         "address_line1": address,
         "address_line2": None,
         "is_business": False,
@@ -256,7 +282,6 @@ def get_or_create_customer(full_name: str, phone: str, address: str | None = Non
 
 
 def create_job(event):
-    
     """
     Create a job from UI data.
 
@@ -301,7 +326,7 @@ def create_job(event):
     if not customer_email:
         return response(400, {"message": "customerEmail is required for confirmation"})
 
-    customer = get_or_create_customer(customer_name, customer_phone, address)
+    customer = get_or_create_customer(customer_name, customer_phone, address, customer_email)
     customer_id = customer["id"]
 
     now = now_utc_iso()
