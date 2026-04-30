@@ -59,6 +59,16 @@
     <section class="panel">
       <div class="panel-body">
         <div class="calendar-header-row">
+          <div class="calendar-timezone">Needs scheduling</div>
+          <div id="needsSchedulingStatus" class="calendar-status"></div>
+        </div>
+        <div id="needsSchedulingJobs" class="calendar-jobs-list"></div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-body">
+        <div class="calendar-header-row">
           <div class="calendar-timezone">
             Times shown in Central time
           </div>
@@ -69,6 +79,42 @@
       </div>
     </section>
   </main>
+
+  <div id="scheduleModal" class="modal-backdrop" style="display:none;">
+    <div class="modal">
+      <div class="modal-header">
+        <div>
+          <div class="modal-title">Schedule job</div>
+          <div id="scheduleJobMeta" class="modal-subtitle"></div>
+        </div>
+        <button id="scheduleClose" class="modal-close" type="button">×</button>
+      </div>
+
+      <form id="scheduleForm" class="job-form">
+        <div class="form-grid">
+          <div class="field">
+            <label class="field-label" for="scheduleTech">Technician</label>
+            <select id="scheduleTech"></select>
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="scheduleDate">Date</label>
+            <input id="scheduleDate" type="date" required />
+          </div>
+
+          <div class="field">
+            <label class="field-label" for="scheduleTime">Time</label>
+            <input id="scheduleTime" type="time" required />
+          </div>
+        </div>
+
+        <div class="form-footer">
+          <button type="submit" class="btn-primary">Schedule</button>
+          <div id="scheduleStatus" class="form-status"></div>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <script src="calendar.js"></script>
 </body>

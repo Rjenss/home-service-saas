@@ -56,7 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       renderSections(unscheduledJobs, latestVisitByJobId, allTechs);
 
-      statusEl.textContent = `Showing ${unscheduledJobs.length} unconfirmed job(s).`;
+      statusEl.textContent = `${unscheduledJobs.length} job(s) awaiting confirmation.`;
     } catch (err) {
       statusEl.textContent = "Error loading data.";
       listEl.textContent = String(err);
