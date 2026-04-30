@@ -17,25 +17,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const statusEl = document.getElementById("unscheduledStatus");
   const listEl = document.getElementById("unscheduledJobs");
 
-  const modalEl = document.getElementById("assignModal");
-  const assignCloseBtn = document.getElementById("assignClose");
-  const assignForm = document.getElementById("assignForm");
-  const assignTechSelect = document.getElementById("assignTech");
-  const assignDateInput = document.getElementById("assignDate");
-  const assignTimeInput = document.getElementById("assignTime");
-  const assignStatus = document.getElementById("assignStatus");
-  const assignJobMeta = document.getElementById("assignJobMeta");
-
-  let cachedTechs = [];
-  let currentJob = null;
-
-  assignCloseBtn.addEventListener("click", closeModal);
-  modalEl.addEventListener("click", (e) => {
-    if (e.target === modalEl) closeModal();
-  });
-
-  assignForm.addEventListener("submit", onAssignSubmit);
-
   loadUnscheduled();
 
   async function loadUnscheduled() {
@@ -65,8 +46,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const allJobs = Array.isArray(jobs) ? jobs : [];
       const allTechs = Array.isArray(techs) ? techs : [];
       const allVisits = Array.isArray(visits) ? visits : [];
-
-      cachedTechs = allTechs;
 
       const unscheduledJobs = allJobs.filter((j) => {
         const s = String(j.status || "").trim().toLowerCase();
@@ -179,13 +158,15 @@ document.addEventListener("DOMContentLoaded", () => {
           <div>Scheduled: ${escapeHtml(dateText ? dateText : "Not set")} ${escapeHtml(timeText ? timeText : "")}</div>
           <div class="visit-notes">${escapeHtml(job.description || "No description")}</div>
           <div class="form-footer" style="margin-top:10px;">
-            <button type="button" class="btn-primary" data-assign="${escapeHtml(job.jobId)}">Assign</button>
+            <button type="button" class="btn-secondary" data-resend="${escapeHtml(job.jobId)}">Resend email</button>
+            <span class="resend-status" style="font-size:0.85rem;margin-left:8px;"></span>
           </div>
         </div>
       `;
 
-      const btn = card.querySelector('button[data-assign]');
-      btn.addEventListener("click", () => openModal(job));
+      const resendBtn = card.querySelector('button[data-resend]');
+      const resendStatus = card.querySelector('.resend-status');
+      resendBtn.addEventListener("click", () => onResend(resendBtn, resendStatus, job.jobId));
 
       list.appendChild(card);
     }
@@ -194,121 +175,33 @@ document.addEventListener("DOMContentLoaded", () => {
     return wrap;
   }
 
-  function openModal(job) {
-    currentJob = job;
-
-    assignStatus.textContent = "";
-    assignJobMeta.textContent = `${job.customerName || "Job"} | ${job.address || ""}`.trim();
-
-    // Populate active technicians only
-    assignTechSelect.innerHTML = "";
-    const activeTechs = cachedTechs.filter(t => t && t.active !== false);
-
-    if (!activeTechs.length) {
-      const opt = document.createElement("option");
-      opt.value = "";
-      opt.textContent = "No active technicians";
-      assignTechSelect.appendChild(opt);
-      assignTechSelect.disabled = true;
-    } else {
-      assignTechSelect.disabled = false;
-      const placeholder = document.createElement("option");
-      placeholder.value = "";
-      placeholder.textContent = "Select technician";
-      placeholder.disabled = true;
-      placeholder.selected = true;
-      assignTechSelect.appendChild(placeholder);
-
-      for (const t of activeTechs) {
-        const opt = document.createElement("option");
-        opt.value = t.id;
-        opt.textContent = `${t.first_name || ""} ${t.last_name || ""}`.trim() || "Technician";
-        assignTechSelect.appendChild(opt);
-      }
-    }
-
-    // Defaults
-    const now = new Date();
-    assignDateInput.value = toIsoDate(now);
-    assignTimeInput.value = roundToNextQuarter(now);
-
-    modalEl.style.display = "flex";
-  }
-
-  function closeModal() {
-    modalEl.style.display = "none";
-    currentJob = null;
-  }
-
-  async function onAssignSubmit(e) {
-    e.preventDefault();
-    if (!currentJob) return;
-
-    const baseUrl = getApiBaseUrl();
-    assignStatus.textContent = "Saving...";
+  async function onResend(btn, statusEl, jobId) {
+    btn.disabled = true;
+    statusEl.textContent = "Sending...";
+    statusEl.style.color = "";
 
     try {
-      const techId = assignTechSelect.value;
-      const dateVal = assignDateInput.value;
-      const timeVal = assignTimeInput.value;
-
-      if (!techId) {
-        assignStatus.textContent = "Select a technician.";
-        return;
-      }
-      if (!dateVal || !timeVal) {
-        assignStatus.textContent = "Date and time are required.";
-        return;
-      }
-
-      const payload = {
-        job_id: currentJob.jobId,
-        technician_id: techId,
-        scheduled_date: dateVal,
-        scheduled_time: timeVal,
-        status: "assigned"
-      };
-
-      const res = await fetch(`${baseUrl}/job_visits`, {
+      const res = await fetch(`${getApiBaseUrl()}/jobs/resend_confirmation`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({ job_id: jobId }),
       });
 
-      const text = await res.text();
-      if (!res.ok) {
-        assignStatus.textContent = `Error: ${res.status} ${text}`;
-        return;
+      if (res.ok) {
+        statusEl.textContent = "Sent!";
+        statusEl.style.color = "#22c55e";
+      } else {
+        const text = await res.text();
+        let msg = `Error ${res.status}`;
+        try { msg = JSON.parse(text).message || msg; } catch (_) {}
+        statusEl.textContent = msg;
+        statusEl.style.color = "#ef4444";
+        btn.disabled = false;
       }
-
-      assignStatus.textContent = "Assigned.";
-      closeModal();
-      await loadUnscheduled();
     } catch (err) {
-      assignStatus.textContent = `Error: ${String(err)}`;
+      statusEl.textContent = "Network error";
+      statusEl.style.color = "#ef4444";
+      btn.disabled = false;
     }
-  }
-
-  function toIsoDate(d) {
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, "0");
-    const day = String(d.getDate()).padStart(2, "0");
-    return `${y}-${m}-${day}`;
-  }
-
-  function roundToNextQuarter(d) {
-    const copy = new Date(d);
-    copy.setSeconds(0, 0);
-    const mins = copy.getMinutes();
-    const rounded = Math.ceil(mins / 15) * 15;
-    if (rounded === 60) {
-      copy.setHours(copy.getHours() + 1);
-      copy.setMinutes(0);
-    } else {
-      copy.setMinutes(rounded);
-    }
-    const hh = String(copy.getHours()).padStart(2, "0");
-    const mm = String(copy.getMinutes()).padStart(2, "0");
-    return `${hh}:${mm}`;
   }
 });

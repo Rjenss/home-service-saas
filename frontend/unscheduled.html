@@ -30,7 +30,7 @@
         <div>
           <h1 class="hero-title">Unscheduled jobs</h1>
           <p class="hero-subtitle">
-            Review work requests that have not been assigned a date and time. These are jobs with status set to Unscheduled.
+            Jobs awaiting customer confirmation. Technician assignment is available after a job is confirmed.
           </p>
         </div>
       </div>
@@ -49,41 +49,6 @@
   </main>
 
   <script src="unscheduled.js"></script>
-    <div id="assignModal" class="modal-backdrop" style="display:none;">
-    <div class="modal">
-      <div class="modal-header">
-        <div>
-          <div class="modal-title">Assign technician</div>
-          <div id="assignJobMeta" class="modal-subtitle"></div>
-        </div>
-        <button id="assignClose" class="modal-close" type="button">×</button>
-      </div>
 
-      <form id="assignForm" class="job-form">
-        <div class="form-grid">
-          <div class="field">
-            <label class="field-label" for="assignTech">Technician</label>
-            <select id="assignTech" required></select>
-          </div>
-
-          <div class="field">
-            <label class="field-label" for="assignDate">Date</label>
-            <input id="assignDate" type="date" required />
-          </div>
-
-          <div class="field">
-            <label class="field-label" for="assignTime">Time</label>
-            <input id="assignTime" type="time" required />
-          </div>
-        </div>
-
-        <div class="form-footer">
-          <button type="submit" class="btn-primary">Assign</button>
-          <div id="assignStatus" class="form-status"></div>
-        </div>
-      </form>
-    </div>
-  </div>
-  
 </body>
 </html>

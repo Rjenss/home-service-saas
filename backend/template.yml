@@ -176,6 +176,12 @@ Resources:
             RestApiId: !Ref ApiGateway
             Path: /job_visits
             Method: post
+        JobsResendPost:
+          Type: Api
+          Properties:
+            RestApiId: !Ref ApiGateway
+            Path: /jobs/resend_confirmation
+            Method: post
         JobVisitsAssignPost:
           Type: Api
           Properties:

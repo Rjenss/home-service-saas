@@ -108,7 +108,10 @@ def lambda_handler(event, context):
     
     if path == "/confirm" and method == "GET":
         return confirm_job(event)
-    
+
+    if path == "/jobs/resend_confirmation" and method == "POST":
+        return resend_confirmation(event)
+
     if path == "/job_visits/assign" and method == "POST":
         return assign_job_visit(event)
 
@@ -434,6 +437,59 @@ def confirm_job(event):
         "headers": {"Content-Type": "text/html", "Access-Control-Allow-Origin": "*"},
         "body": "<html><body><h2>Confirmed</h2><p>Your request is confirmed. You may close this tab.</p></body></html>",
     }
+
+
+def resend_confirmation(event):
+    """
+    POST /jobs/resend_confirmation
+    Body: { "job_id": "..." }
+
+    Reissues a fresh confirm token and resends the confirmation email.
+    Only works for jobs that are still Unscheduled (not yet confirmed).
+    """
+    body = safe_json_body(event)
+    if body is None:
+        return response(400, {"message": "Invalid JSON body"})
+
+    job_id = (body.get("job_id") or "").strip()
+    if not job_id:
+        return response(400, {"message": "job_id is required"})
+
+    job = jobs_table.get_item(Key={"jobId": job_id}).get("Item")
+    if not job or job.get("organization_id") != ORGANIZATION_ID:
+        return response(404, {"message": "Job not found"})
+
+    if str(job.get("status", "")).lower() != "unscheduled":
+        return response(409, {"message": "Job is already confirmed"})
+
+    customer_email = job.get("customerEmail", "")
+    if not customer_email:
+        return response(400, {"message": "No customer email on file for this job"})
+
+    new_token = secrets.token_urlsafe(24)
+    expires_at = (datetime.now(timezone.utc) + timedelta(hours=CONFIRM_TOKEN_TTL_HOURS)).isoformat()
+    now = now_utc_iso()
+
+    jobs_table.update_item(
+        Key={"jobId": job_id},
+        UpdateExpression="SET confirm_token = :t, confirm_token_expires_at = :e, updated_at = :u",
+        ExpressionAttributeValues={":t": new_token, ":e": expires_at, ":u": now},
+    )
+
+    api_base_url = os.environ.get("API_BASE_URL", "").rstrip("/")
+    confirm_url = f"{api_base_url}/confirm?token={new_token}"
+
+    try:
+        send_confirmation_email(
+            to_email=customer_email,
+            customer_name=job.get("customerName", ""),
+            confirm_url=confirm_url,
+        )
+    except Exception:
+        logger.exception("Failed to resend confirmation email")
+        return response(500, {"message": "Failed to send email"})
+
+    return response(200, {"message": "Confirmation email resent"})
 
 
 # ---------- JOB VISITS ----------
